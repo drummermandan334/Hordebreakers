@@ -9,6 +9,10 @@ namespace Hordebreakers
     /// </summary>
     public class Projectile : MonoBehaviour
     {
+        [Header("Tuning")]
+        [Tooltip("Sphere radius of the per-frame hit cast (how 'fat' the projectile reads against colliders).")]
+        [SerializeField] private float castRadius = 0.25f;
+
         private Vector3 _dir;
         private float _damage;
         private int _marks;
@@ -31,7 +35,7 @@ namespace Hordebreakers
             float dt = Time.deltaTime;
             float step = _speed * dt;
 
-            if (Physics.SphereCast(transform.position, 0.25f, _dir, out RaycastHit hit, step, _mask,
+            if (Physics.SphereCast(transform.position, castRadius, _dir, out RaycastHit hit, step, _mask,
                                    QueryTriggerInteraction.Ignore))
             {
                 Collider col = hit.collider;

@@ -17,6 +17,23 @@ namespace Hordebreakers
         [SerializeField] private GameObject telegraphPrefab;
         [SerializeField] private HitFlash hitFlash;
 
+        [Header("Tuning")]
+        [Tooltip("Grace period before the elite can slam after spawning.")]
+        [SerializeField] private float initialSlamCooldown = 1.5f;
+        [Tooltip("Camera shake when the slam lands (x = amplitude, y = seconds).")]
+        [SerializeField] private Vector2 slamShake = new Vector2(0.25f, 0.3f);
+
+        [Header("Animator (Speed param value + damping time)")]
+        [Tooltip("Speed param while moving toward the player, and its blend damping time.")]
+        [SerializeField] private float animSpeedMove = 1f;
+        [SerializeField] private float animDampMove = 0.15f;
+        [Tooltip("Animator Speed damping time when stopping (stagger).")]
+        [SerializeField] private float animDampStop = 0.1f;
+
+        [Header("Fallbacks")]
+        [Tooltip("Death animation duration used only if EliteData is missing (normally data.deathDuration).")]
+        [SerializeField] private float fallbackDeathDuration = 1.6f;
+
         private Markable _mark;
         private CapsuleCollider _collider;
         private Transform _player;
@@ -63,7 +80,7 @@ namespace Hordebreakers
             _dying = false;
             _slamming = false;
             _slamHitPending = false;
-            _cdTimer = 1.5f;
+            _cdTimer = initialSlamCooldown;
             _staggerTimer = 0f;
             _separationMask = (1 << gameObject.layer) | (player != null ? (1 << player.gameObject.layer) : 0);
             if (_collider != null) _collider.enabled = true;
@@ -88,7 +105,7 @@ namespace Hordebreakers
 
             transform.position += Separation() * (data.separationForce * dt);   // crowd separation
             if (_cdTimer > 0f) _cdTimer -= dt;
-            if (_staggerTimer > 0f) { _staggerTimer -= dt; if (animator != null) animator.SetFloat(AnimSpeed, 0f, 0.1f, dt); return; }
+            if (_staggerTimer > 0f) { _staggerTimer -= dt; if (animator != null) animator.SetFloat(AnimSpeed, 0f, animDampStop, dt); return; }
 
             Vector3 to = _player.position - transform.position; to.y = 0f;
             float dist = to.magnitude;
@@ -101,7 +118,7 @@ namespace Hordebreakers
                 transform.position += dir * data.moveSpeed * dt;
                 modelRoot.rotation = Quaternion.LookRotation(dir);
             }
-            if (animator != null) animator.SetFloat(AnimSpeed, 1f, 0.15f, dt);
+            if (animator != null) animator.SetFloat(AnimSpeed, animSpeedMove, animDampMove, dt);
         }
 
         private void StartSlam()
@@ -137,7 +154,7 @@ namespace Hordebreakers
                     Vector3 d = _player.position - _slamPoint; d.y = 0f;
                     if (d.magnitude <= data.slamRadius) _playerDmg.TakeDamage(data.slamDamage);
                 }
-                if (ThirdPersonCamera.Instance != null) ThirdPersonCamera.Instance.Shake(0.25f, 0.3f);
+                if (ThirdPersonCamera.Instance != null) ThirdPersonCamera.Instance.Shake(slamShake.x, slamShake.y);
             }
 
             if (_slamTimer <= 0f)
@@ -184,7 +201,7 @@ namespace Hordebreakers
         {
             _active = false;
             _dying = true;
-            _deathTimer = data != null ? data.deathDuration : 1.6f;
+            _deathTimer = data != null ? data.deathDuration : fallbackDeathDuration;
             if (_collider != null) _collider.enabled = false;
             if (_telegraph != null) Destroy(_telegraph);
             if (animator != null) animator.SetTrigger(AnimDead);

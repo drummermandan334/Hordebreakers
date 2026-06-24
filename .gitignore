@@ -60,6 +60,9 @@ crashlytics-build.properties
 Thumbs.db
 desktop.ini
 
+# Dev screenshots (editor / MCP captures — not project assets)
+/[Aa]ssets/[Ss]creenshots/
+
 # Auto memory written by Claude Code lives outside the repo (~/.claude/...),
 # nothing to ignore here — listed only as a reminder.
 

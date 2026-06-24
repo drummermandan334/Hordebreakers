@@ -29,6 +29,11 @@ namespace Hordebreakers
         [SerializeField] private float spawnIntervalWaveMult = 0.85f;   // each wave spawns faster
         [SerializeField] private float minSpawnInterval = 0.18f;
         [SerializeField] private int firstBruteWave = 2;
+        [Tooltip("Delay after a wave starts before the first Brute is injected (waves at/after firstBruteWave).")]
+        [SerializeField] private float bruteFirstSpawnDelay = 3f;
+        [Tooltip("Interval between Brute injections = max(floor, baseInterval - wave). Floor it never drops below.")]
+        [SerializeField] private float bruteIntervalFloor = 8f;
+        [SerializeField] private float bruteIntervalBase = 18f;
 
         private ObjectPool<Enemy> _huskPool;
         private Action<Enemy> _huskReturn;
@@ -92,7 +97,7 @@ namespace Hordebreakers
                 if (_bruteTimer <= 0f)
                 {
                     SpawnBrute();
-                    _bruteTimer = Mathf.Max(8f, 18f - _wave);   // more frequent as waves climb
+                    _bruteTimer = Mathf.Max(bruteIntervalFloor, bruteIntervalBase - _wave);   // more frequent as waves climb
                 }
             }
 
@@ -111,7 +116,7 @@ namespace Hordebreakers
             _inBreather = false;
             _phaseTimer = waveDuration;
             _spawnTimer = 0f;
-            _bruteTimer = (_wave >= firstBruteWave) ? 3f : 999f;
+            _bruteTimer = (_wave >= firstBruteWave) ? bruteFirstSpawnDelay : 999f;
             if (GameManager.Instance != null) GameManager.Instance.SetWave(_wave);
         }
 

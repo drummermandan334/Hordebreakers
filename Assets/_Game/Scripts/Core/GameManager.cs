@@ -16,9 +16,21 @@ namespace Hordebreakers
         [SerializeField] private string enemyLayerName = "Enemy";
         [SerializeField] private int baseXpToNext = 5;
 
+        [Header("XP curve (next-level cost grows each level)")]
+        [Tooltip("XpToNext is multiplied by this each level-up.")]
+        [SerializeField] private float xpToNextGrowth = 1.25f;
+        [Tooltip("Flat amount added to XpToNext each level-up (on top of the growth multiplier).")]
+        [SerializeField] private int xpToNextFlatAdd = 2;
+
         [Header("XP gems")]
         [SerializeField] private XpGem gemPrefab;
         [SerializeField] private int gemPoolSize = 128;
+        [Tooltip("Height above the drop point a gem spawns at.")]
+        [SerializeField] private float gemSpawnHeight = 0.5f;
+
+        [Header("Hit-stop")]
+        [Tooltip("Default time-scale used during hit-stop when a caller doesn't specify one.")]
+        [Range(0f, 1f)][SerializeField] private float defaultHitStopScale = 0.05f;
 
         public int Level { get; private set; } = 1;
         public int Xp { get; private set; }
@@ -70,11 +82,12 @@ namespace Hordebreakers
             }
         }
 
-        /// <summary>Brief slow-mo on impact (juice). Uses unscaled time to recover.</summary>
-        public void HitStop(float seconds, float scale = 0.05f)
+        /// <summary>Brief slow-mo on impact (juice). Uses unscaled time to recover.
+        /// Pass a negative scale (the default) to use <see cref="defaultHitStopScale"/>.</summary>
+        public void HitStop(float seconds, float scale = -1f)
         {
             if (LevelUpPending) return;
-            Time.timeScale = scale;
+            Time.timeScale = scale < 0f ? defaultHitStopScale : scale;
             _hitStopTimer = seconds;
         }
 
@@ -82,7 +95,7 @@ namespace Hordebreakers
         {
             if (_gemPool == null) return;
             XpGem g = _gemPool.Get();
-            g.transform.position = pos + Vector3.up * 0.5f;
+            g.transform.position = pos + Vector3.up * gemSpawnHeight;
             g.Init(value, _player, _gemReturn);
         }
 
@@ -99,7 +112,7 @@ namespace Hordebreakers
             {
                 Xp -= XpToNext;
                 Level++;
-                XpToNext = Mathf.RoundToInt(XpToNext * 1.25f) + 2;
+                XpToNext = Mathf.RoundToInt(XpToNext * xpToNextGrowth) + xpToNextFlatAdd;
                 // Cards disabled: level-ups bank silently mid-arena. The pick happens AFTER an arena is
                 // cleared (D&D-style) — wire that to the arena/wave-complete flow when it exists.
                 OnLevelUp?.Invoke(Level);

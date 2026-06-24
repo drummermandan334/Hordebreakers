@@ -26,6 +26,10 @@ namespace Hordebreakers
         [SerializeField] private float cooldown = 0.55f;
         [Tooltip("Snap the throw to the nearest enemy within this range and a forward cone.")]
         [SerializeField] private float aimAssistRange = 14f;
+        [Tooltip("Aim-assist cone width: enemies whose direction·facing is below this are ignored (higher = narrower cone).")]
+        [SerializeField] private float aimAssistConeDot = 0.4f;
+        [Tooltip("Vertical aim is clamped to +/- this so throws stay roughly level.")]
+        [SerializeField] private float aimVerticalClamp = 2f;
         [SerializeField] private int poolSize = 16;
 
         private ObjectPool<Projectile> _pool;
@@ -66,7 +70,7 @@ namespace Hordebreakers
             if (target != null)
             {
                 Vector3 to = (target.position + Vector3.up) - origin;
-                to.y = Mathf.Clamp(to.y, -2f, 2f);
+                to.y = Mathf.Clamp(to.y, -aimVerticalClamp, aimVerticalClamp);
                 if (to.sqrMagnitude > 0.001f) dir = to.normalized;
             }
 
@@ -84,7 +88,7 @@ namespace Hordebreakers
             {
                 Vector3 to = _hits[i].transform.position - origin; to.y = 0f;
                 if (to.sqrMagnitude < 0.01f) continue;
-                if (Vector3.Dot(to.normalized, fwd) < 0.4f) continue;   // forward cone only
+                if (Vector3.Dot(to.normalized, fwd) < aimAssistConeDot) continue;   // forward cone only
                 if (to.sqrMagnitude < bestSq) { bestSq = to.sqrMagnitude; best = _hits[i].transform; }
             }
             return best;

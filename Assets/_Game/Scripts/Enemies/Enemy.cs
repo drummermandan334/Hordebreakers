@@ -18,6 +18,45 @@ namespace Hordebreakers
         [SerializeField] private Animator animator;
         [SerializeField] private HitFlash hitFlash;
 
+        [Header("Aggression (per-instance variety, derived from a 0..1 roll)")]
+        [Tooltip("Standoff ring = attackRange * (base - slope * aggression). Aggressive enemies crowd in closer.")]
+        [SerializeField] private float standoffRangeBase = 1.35f;
+        [SerializeField] private float standoffRangeAggressionSlope = 0.6f;
+        [Tooltip("Attack cooldown = attackCooldown * (base - slope * aggression). Aggressive enemies strike more often.")]
+        [SerializeField] private float attackCooldownBase = 1.4f;
+        [SerializeField] private float attackCooldownAggressionSlope = 0.8f;
+        [Tooltip("Initial cooldown is randomized between this and the per-instance attack cooldown (desyncs the crowd).")]
+        [SerializeField] private float initialCooldownMin = 0.3f;
+        [Tooltip("Per-instance ring slot angle is randomized within +/- this (fans the crowd out).")]
+        [SerializeField] private float slotOffsetRange = 35f;
+
+        [Header("Movement / approach")]
+        [Tooltip("Rate the hit-recoil knockback impulse decays toward zero.")]
+        [SerializeField] private float knockbackDecayRate = 12f;
+        [Tooltip("Extra distance past the standoff ring before the enemy stops approaching.")]
+        [SerializeField] private float ringApproachBuffer = 0.4f;
+        [Tooltip("How hard the enemy corrects back toward the ring distance while circling.")]
+        [SerializeField] private float ringHoldStrength = 0.6f;
+        [Tooltip("Strafe (circle) speed fraction = base + aggressionScale * (1 - aggression). Cautious enemies circle more.")]
+        [SerializeField] private float strafeSpeedBase = 0.3f;
+        [SerializeField] private float strafeSpeedAggressionScale = 0.35f;
+        [Tooltip("Reach multiplier for the lunge-connect check (player must be within standoff * this).")]
+        [SerializeField] private float lungeConnectReachMult = 1.25f;
+
+        [Header("Animator blend (Speed param value + damping time)")]
+        [Tooltip("Speed param while approaching the ring, and its blend damping time.")]
+        [SerializeField] private float animSpeedApproach = 1f;
+        [SerializeField] private float animDampApproach = 0.12f;
+        [Tooltip("Speed param while circling/strafing in the ring, and its blend damping time.")]
+        [SerializeField] private float animSpeedStrafe = 0.45f;
+        [SerializeField] private float animDampStrafe = 0.15f;
+        [Tooltip("Animator Speed damping time when stopping (stagger / recover).")]
+        [SerializeField] private float animDampStop = 0.1f;
+
+        [Header("Fallbacks")]
+        [Tooltip("Death animation duration used only if EnemyData is missing (normally data.deathDuration).")]
+        [SerializeField] private float fallbackDeathDuration = 1.1f;
+
         private EnemyData _data;
         private Markable _mark;
         private CapsuleCollider _collider;
@@ -72,10 +111,10 @@ namespace Hordebreakers
             _state = State.Seek;
             _stateTimer = 0f;
             _aggression = UnityEngine.Random.value;
-            _standoff = data.attackRange * (1.35f - 0.6f * _aggression);    // aggressive enemies crowd in close
-            _attackCd = data.attackCooldown * (1.4f - 0.8f * _aggression);   // aggressive enemies strike more often
-            _cooldownTimer = UnityEngine.Random.Range(0.3f, _attackCd);      // desync the crowd
-            _slotOffset = UnityEngine.Random.Range(-35f, 35f);
+            _standoff = data.attackRange * (standoffRangeBase - standoffRangeAggressionSlope * _aggression);    // aggressive enemies crowd in close
+            _attackCd = data.attackCooldown * (attackCooldownBase - attackCooldownAggressionSlope * _aggression);   // aggressive enemies strike more often
+            _cooldownTimer = UnityEngine.Random.Range(initialCooldownMin, _attackCd);      // desync the crowd
+            _slotOffset = UnityEngine.Random.Range(-slotOffsetRange, slotOffsetRange);
             _strafeDir = UnityEngine.Random.value < 0.5f ? -1f : 1f;
             _staggerTimer = 0f;
             _separationMask = (1 << gameObject.layer) | (player != null ? (1 << player.gameObject.layer) : 0);
@@ -100,13 +139,13 @@ namespace Hordebreakers
             if (_knockback.sqrMagnitude > 0.0001f)   // hit recoil (weight)
             {
                 transform.position += _knockback * dt;
-                _knockback = Vector3.Lerp(_knockback, Vector3.zero, 1f - Mathf.Exp(-12f * dt));
+                _knockback = Vector3.Lerp(_knockback, Vector3.zero, 1f - Mathf.Exp(-knockbackDecayRate * dt));
             }
 
             transform.position += Separation() * (_data.separationForce * dt);   // crowd separation: don't pile on / clip through
 
             if (_cooldownTimer > 0f) _cooldownTimer -= dt;
-            if (_staggerTimer > 0f) { _staggerTimer -= dt; if (animator != null) animator.SetFloat(AnimSpeed, 0f, 0.1f, dt); return; }
+            if (_staggerTimer > 0f) { _staggerTimer -= dt; if (animator != null) animator.SetFloat(AnimSpeed, 0f, animDampStop, dt); return; }
 
             switch (_state)
             {
@@ -125,7 +164,7 @@ namespace Hordebreakers
 
             FacePlayer();
 
-            if (dist > _standoff + 0.4f)
+            if (dist > _standoff + ringApproachBuffer)
             {
                 // approach the standoff ring, nudged to this enemy's slot so the crowd fans out
                 Vector3 ringDir = Quaternion.Euler(0f, _slotOffset, 0f) * dirFromPlayer;
@@ -134,7 +173,7 @@ namespace Hordebreakers
                 Vector3 step = toTarget.normalized * _data.moveSpeed * dt;
                 if (step.sqrMagnitude > toTarget.sqrMagnitude) step = toTarget;
                 transform.position += step;
-                if (animator != null) animator.SetFloat(AnimSpeed, 1f, 0.12f, dt);
+                if (animator != null) animator.SetFloat(AnimSpeed, animSpeedApproach, animDampApproach, dt);
                 return;
             }
 
@@ -148,10 +187,10 @@ namespace Hordebreakers
             }
 
             Vector3 tangent = Vector3.Cross(Vector3.up, dirFromPlayer) * _strafeDir;
-            Vector3 radialFix = dirFromPlayer * (_standoff - dist) * 0.6f;   // hold the ring distance
-            float strafe = 0.3f + 0.35f * (1f - _aggression);                // cautious enemies circle more
+            Vector3 radialFix = dirFromPlayer * (_standoff - dist) * ringHoldStrength;   // hold the ring distance
+            float strafe = strafeSpeedBase + strafeSpeedAggressionScale * (1f - _aggression);                // cautious enemies circle more
             transform.position += (tangent * _data.moveSpeed * strafe + radialFix) * dt;
-            if (animator != null) animator.SetFloat(AnimSpeed, 0.45f, 0.15f, dt);
+            if (animator != null) animator.SetFloat(AnimSpeed, animSpeedStrafe, animDampStrafe, dt);
         }
 
         private void TickWindup(float dt)
@@ -178,7 +217,7 @@ namespace Hordebreakers
                 if (_playerDmg != null && _playerDmg.IsAlive)
                 {
                     Vector3 to = _player.position - transform.position; to.y = 0f;
-                    if (to.magnitude <= _standoff * 1.25f)
+                    if (to.magnitude <= _standoff * lungeConnectReachMult)
                         _playerDmg.TakeDamage(_data.contactDamage);
                 }
                 _state = State.Recover;
@@ -188,7 +227,7 @@ namespace Hordebreakers
 
         private void TickRecover(float dt)
         {
-            if (animator != null) animator.SetFloat(AnimSpeed, 0f, 0.1f, dt);
+            if (animator != null) animator.SetFloat(AnimSpeed, 0f, animDampStop, dt);
             _stateTimer -= dt;
             if (_stateTimer <= 0f)
             {
@@ -245,7 +284,7 @@ namespace Hordebreakers
         {
             _active = false;
             _dying = true;
-            _deathTimer = _data != null ? _data.deathDuration : 1.1f;
+            _deathTimer = _data != null ? _data.deathDuration : fallbackDeathDuration;
             if (_collider != null) _collider.enabled = false;
             if (animator != null) animator.SetTrigger(AnimDead);
             if (GameManager.Instance != null)

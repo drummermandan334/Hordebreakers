@@ -27,13 +27,12 @@ namespace Hordebreakers
         [SerializeField] private HitFlash hitFlash;               // player flash on taking damage (defaults to child)
         [Tooltip("Front-arc gate for melee: enemies whose direction·facing is below this are ignored.")]
         [SerializeField] private float meleeArcDot = 0.35f;
+        [Tooltip("Melee hitbox center is placed this fraction of reach in front of the player.")]
+        [SerializeField] private float meleeHitboxCenterFactor = 0.5f;
+        [Tooltip("Melee hitbox radius as a fraction of reach.")]
+        [SerializeField] private float meleeHitboxRadiusFactor = 0.45f;
 
-        [Header("Slash FX (optional — rides the blade)")]
-        [SerializeField] private GameObject lightSlashVfx;
-        [SerializeField] private GameObject heavySlashVfx;
-        [SerializeField] private Transform weaponSocket;          // the Sword, so the FX sweeps with it
-        [SerializeField] private Vector3 slashLocalPos = Vector3.zero;
-        [SerializeField] private Vector3 slashLocalEuler = Vector3.zero;
+        // Attack VFX (slash / stab swipe) is handled by the WeaponVfx component on this object.
 
         [Header("Forward drive (brief step on a swing, hard stop)")]
         [SerializeField] private float attackStep = 2.5f;         // forward m/s on a slash / heavy
@@ -43,6 +42,10 @@ namespace Hordebreakers
         [SerializeField] private float gripBlendSpeed = 10f;
         [Tooltip("Override weight of the SwordArm ready-stance layer in locomotion (~0.7 keeps some base-loco arm).")]
         [SerializeField] private float armLayerWeight = 0.7f;
+        [Tooltip("How fast the model turns to face the movement direction (exponential slerp rate).")]
+        [SerializeField] private float faceTurnSpeed = 15f;
+        [Tooltip("Animator Speed parameter damping time (smooths the locomotion blend).")]
+        [SerializeField] private float animSpeedDamp = 0.1f;
 
         [Header("Jump")]
         [SerializeField] private float jumpSpeed = 7f;            // initial upward velocity
@@ -52,6 +55,22 @@ namespace Hordebreakers
         [Header("Detonation (heavy finisher pops Marks)")]
         [Tooltip("Delay from the heavy-finisher press to the AoE detonation (lines up with the strike).")]
         [SerializeField] private float detonateDelay = 0.14f;
+        [Tooltip("Detonation center is placed this fraction of heavyReach in front of the player.")]
+        [SerializeField] private float detonateForwardFactor = 0.6f;
+        [Tooltip("Seconds the spawned detonation VFX instance lives before being destroyed.")]
+        [SerializeField] private float detonateVfxLifetime = 2f;
+
+        [Header("Juice — shake (x=amplitude, y=seconds) + hit-stop (x=seconds, y=timeScale)")]
+        [SerializeField] private Vector2 hitShake = new Vector2(0.07f, 0.08f);
+        [SerializeField] private Vector2 hitStop = new Vector2(0.03f, 0.3f);
+        [SerializeField] private Vector2 finisherShake = new Vector2(0.16f, 0.14f);
+        [SerializeField] private Vector2 finisherHitStop = new Vector2(0.07f, 0.12f);
+        [Tooltip("Detonation shake: x = base amplitude (grows per mark), y = seconds.")]
+        [SerializeField] private Vector2 detonateShake = new Vector2(0.12f, 0.25f);
+        [SerializeField] private float detonateShakePerStack = 0.03f;
+        [SerializeField] private float detonateHitStop = 0.08f;
+        [SerializeField] private Vector2 damageShake = new Vector2(0.18f, 0.18f);
+        [SerializeField] private Vector2 damageHitStop = new Vector2(0.05f, 0.25f);
 
         [Tooltip("DEBUG: player takes no damage (for feel-testing). Turn OFF for real runs.")]
         [SerializeField] private bool invincible = false;
@@ -243,12 +262,12 @@ namespace Hordebreakers
         private void FaceDir(Vector3 dir, float dt)
         {
             Quaternion target = Quaternion.LookRotation(dir);
-            modelRoot.rotation = Quaternion.Slerp(modelRoot.rotation, target, 1f - Mathf.Exp(-15f * dt));
+            modelRoot.rotation = Quaternion.Slerp(modelRoot.rotation, target, 1f - Mathf.Exp(-faceTurnSpeed * dt));
         }
 
         private void SetAnimSpeed(float target, float dt)
         {
-            if (animator != null) animator.SetFloat(AnimSpeed, target, 0.1f, dt);
+            if (animator != null) animator.SetFloat(AnimSpeed, target, animSpeedDamp, dt);
         }
 
         /// <summary>
@@ -319,7 +338,6 @@ namespace Hordebreakers
             _comboStep = (InComboAttack() && _comboStep < 3) ? _comboStep + 1 : 1;   // chaining advances the slot; a fresh attack resets it
             SoftTargetFace();
             if (animator != null) animator.SetTrigger(heavy ? AnimHeavy : AnimLight);
-            SpawnSlash(heavy ? heavySlashVfx : lightSlashVfx);
 
             bool finisher = _comboStep >= 3;
             StepForward(finisher ? lungeStep : attackStep);
@@ -339,37 +357,25 @@ namespace Hordebreakers
             if (_detonateTimer > 0f) return;
 
             _detonatePending = false;
-            SpawnSlash(heavySlashVfx);
-            Vector3 center = transform.position + modelRoot.forward * (data.heavyReach * 0.6f) + Vector3.up;
+            Vector3 center = transform.position + modelRoot.forward * (data.heavyReach * detonateForwardFactor) + Vector3.up;
             int stacks = Detonate(center, data.detonationRadius);    // consume + burst marks
-            if (detonationVfxPrefab != null) Destroy(Instantiate(detonationVfxPrefab, center, Quaternion.identity), 2f);
+            if (detonationVfxPrefab != null) Destroy(Instantiate(detonationVfxPrefab, center, Quaternion.identity), detonateVfxLifetime);
 
             // Juice scales with the payoff: bigger detonation -> bigger shake, brief hit-stop on a real pop.
             if (ThirdPersonCamera.Instance != null)
-                ThirdPersonCamera.Instance.Shake(0.12f + Mathf.Min(stacks, 20) * 0.03f, 0.25f);
+                ThirdPersonCamera.Instance.Shake(detonateShake.x + Mathf.Min(stacks, 20) * detonateShakePerStack, detonateShake.y);
             if (stacks > 0 && GameManager.Instance != null)
-                GameManager.Instance.HitStop(0.08f);
+                GameManager.Instance.HitStop(detonateHitStop);
         }
 
         // ---------- FX / feedback ----------
-        private void SpawnSlash(GameObject prefab)
-        {
-            if (prefab == null) return;
-            Transform socket = weaponSocket != null ? weaponSocket : modelRoot;
-            GameObject fx = Instantiate(prefab);
-            fx.transform.SetParent(socket, false);
-            fx.transform.localPosition = slashLocalPos;
-            fx.transform.localRotation = Quaternion.Euler(slashLocalEuler);
-            Destroy(fx, 1.2f);
-        }
-
         /// <summary>Impact feedback (weight): camera shake + brief hit-stop, stronger on the finisher.</summary>
         private void HitJuice(bool finisher)
         {
-            if (ThirdPersonCamera.Instance != null)
-                ThirdPersonCamera.Instance.Shake(finisher ? 0.16f : 0.07f, finisher ? 0.14f : 0.08f);
-            if (GameManager.Instance != null)
-                GameManager.Instance.HitStop(finisher ? 0.07f : 0.03f, finisher ? 0.12f : 0.3f);
+            Vector2 shake = finisher ? finisherShake : hitShake;
+            Vector2 stop = finisher ? finisherHitStop : hitStop;
+            if (ThirdPersonCamera.Instance != null) ThirdPersonCamera.Instance.Shake(shake.x, shake.y);
+            if (GameManager.Instance != null) GameManager.Instance.HitStop(stop.x, stop.y);
         }
 
         // ---------- Hit helpers (non-alloc, front-arc) ----------
@@ -377,8 +383,8 @@ namespace Hordebreakers
         {
             Vector3 origin = transform.position + Vector3.up;
             Vector3 fwd = modelRoot.forward;
-            Vector3 c = origin + fwd * (reach * 0.5f);
-            int n = Physics.OverlapSphereNonAlloc(c, reach * 0.45f, _hits, enemyMask);
+            Vector3 c = origin + fwd * (reach * meleeHitboxCenterFactor);
+            int n = Physics.OverlapSphereNonAlloc(c, reach * meleeHitboxRadiusFactor, _hits, enemyMask);
             int hits = 0;
             for (int i = 0; i < n; i++)
             {
@@ -432,8 +438,8 @@ namespace Hordebreakers
             if (invincible || _invulnerable || _hp <= 0f) return;
             _hp -= amount;
             if (hitFlash != null) hitFlash.Flash();
-            if (ThirdPersonCamera.Instance != null) ThirdPersonCamera.Instance.Shake(0.18f, 0.18f);
-            if (GameManager.Instance != null) GameManager.Instance.HitStop(0.05f, 0.25f);
+            if (ThirdPersonCamera.Instance != null) ThirdPersonCamera.Instance.Shake(damageShake.x, damageShake.y);
+            if (GameManager.Instance != null) GameManager.Instance.HitStop(damageHitStop.x, damageHitStop.y);
             if (_hp <= 0f) Die();
         }
 

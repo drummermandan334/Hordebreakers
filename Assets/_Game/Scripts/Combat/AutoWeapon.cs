@@ -12,6 +12,11 @@ namespace Hordebreakers
         [SerializeField] private WeaponData data;
         [SerializeField] private LayerMask enemyMask;
         [SerializeField] private int poolSize = 32;
+        [Header("Tuning")]
+        [Tooltip("Retry delay when there is no target in range before checking again.")]
+        [SerializeField] private float noTargetRetryInterval = 0.1f;
+        [Tooltip("Vertical aim is clamped to +/- this so shots stay roughly level.")]
+        [SerializeField] private float aimVerticalClamp = 2f;
 
         private ObjectPool<Projectile> _pool;
         private Action<Projectile> _returnAction;
@@ -40,7 +45,7 @@ namespace Hordebreakers
             if (_timer > 0f) return;
 
             Transform target = FindNearest(data.range);
-            if (target == null) { _timer = 0.1f; return; }   // nothing in range; retry soon
+            if (target == null) { _timer = noTargetRetryInterval; return; }   // nothing in range; retry soon
 
             Fire(target);
             _timer = data.fireInterval;
@@ -50,7 +55,7 @@ namespace Hordebreakers
         {
             Vector3 origin = transform.position + Vector3.up;
             Vector3 dir = (target.position + Vector3.up) - origin;
-            dir.y = Mathf.Clamp(dir.y, -2f, 2f);
+            dir.y = Mathf.Clamp(dir.y, -aimVerticalClamp, aimVerticalClamp);
             dir.Normalize();
 
             Projectile p = _pool.Get();

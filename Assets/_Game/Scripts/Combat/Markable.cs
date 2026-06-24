@@ -10,6 +10,8 @@ namespace Hordebreakers
     {
         [SerializeField] private Renderer markRenderer;          // optional; emissive-capable material
         [SerializeField] private Color markColor = new Color(1f, 0.5f, 0f);
+        [Tooltip("Emissive glow intensity at full stacks (markColor is multiplied by this * stackFraction).")]
+        [SerializeField] private float emissionIntensity = 2f;
 
         private int _stacks;
         private int _max = 10;
@@ -62,7 +64,7 @@ namespace Hordebreakers
             if (_mpb == null) _mpb = new MaterialPropertyBlock();
             markRenderer.GetPropertyBlock(_mpb);
             float t = _max > 0 ? (float)_stacks / _max : 0f;
-            _mpb.SetColor(EmissionId, markColor * (t * 2f));
+            _mpb.SetColor(EmissionId, markColor * (t * emissionIntensity));
             markRenderer.SetPropertyBlock(_mpb);
         }
     }

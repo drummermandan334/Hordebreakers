@@ -14,6 +14,8 @@ namespace Hordebreakers
         [SerializeField] private float moveSpeed = 11f;
         [SerializeField] private float spinSpeed = 140f;
         [SerializeField] private float lifetime = 18f;
+        [Tooltip("Height above the player's feet the gem homes toward (so it flies to the chest, not the floor).")]
+        [SerializeField] private float targetHeightOffset = 0.8f;
 
         private int _value;
         private Transform _player;
@@ -41,7 +43,7 @@ namespace Hordebreakers
             if (_life <= 0f) { Despawn(); return; }
 
             if (_player == null) return;
-            Vector3 to = (_player.position + Vector3.up * 0.8f) - transform.position;
+            Vector3 to = (_player.position + Vector3.up * targetHeightOffset) - transform.position;
             float d = to.magnitude;
             if (d <= pickupRadius)
             {
