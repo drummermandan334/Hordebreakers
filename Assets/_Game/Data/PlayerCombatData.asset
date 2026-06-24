@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e223671541c5f9479638bab0ada5d49, type: 3}
+  m_Name: PlayerCombatData
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.PlayerCombatData
+  maxHp: 100
+  moveSpeed: 5
+  dodgeSpeed: 16
+  dodgeDuration: 0.25
+  dodgeIFrames: 0.2
+  dodgeCooldown: 1
+  lightDamage: 8
+  lightReach: 2.2
+  lightDuration: 0.22
+  comboHits: 3
+  comboWindow: 0.6
+  heavyDamage: 30
+  heavyReach: 2.6
+  heavyWindup: 0.32
+  heavyRecovery: 0.2
+  detonationRadius: 4
+  detonationDamagePerStack: 6
+  detonationFlatDamage: 5
+  softTargetRange: 5

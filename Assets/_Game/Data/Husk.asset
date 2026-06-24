@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c76e8bca0ef64ec48b1e0fa5c81c9bc2, type: 3}
+  m_Name: Husk
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.EnemyData
+  maxHp: 12
+  moveSpeed: 3
+  contactDamage: 5
+  contactInterval: 1
+  contactRange: 1.4
+  markMaxStacks: 10
+  markDecayTime: 4
