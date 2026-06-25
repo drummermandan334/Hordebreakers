@@ -25,23 +25,23 @@ MonoBehaviour:
     version: 2
     RefIds:
     - rid: 8406688341614395532
-      type: {class: EvolutionEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      type: {class: EvolutionEffect, ns: Hordebreakers, asm: Hordebreakers}
       data:
         prerequisites:
-        - {fileID: 11400000, guid: 760af120b7fac6b4283767519e1f3ab0, type: 2}
-        - {fileID: 11400000, guid: 5fef6583291810b47aa863699aaf5da9, type: 2}
+        - {fileID: 0}
+        - {fileID: 0}
         consumePrerequisites: 1
         evolvedEffects:
         - rid: 8406688341614395533
         - rid: 8406688341614395534
     - rid: 8406688341614395533
-      type: {class: WeaponModEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      type: {class: WeaponModEffect, ns: Hordebreakers, asm: Hordebreakers}
       data:
         target: 0
         op: 1
         amount: 1.5
     - rid: 8406688341614395534
-      type: {class: WeaponModEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      type: {class: WeaponModEffect, ns: Hordebreakers, asm: Hordebreakers}
       data:
         target: 2
         op: 1

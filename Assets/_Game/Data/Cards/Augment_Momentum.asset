@@ -24,7 +24,7 @@ MonoBehaviour:
     version: 2
     RefIds:
     - rid: 8406688341614395531
-      type: {class: StatModEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      type: {class: StatModEffect, ns: Hordebreakers, asm: Hordebreakers}
       data:
         target: 6
         op: 0

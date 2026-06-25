@@ -9,6 +9,7 @@ namespace Hordebreakers
     /// Camera shake on impact. The flashy VFX is a later juice pass — this is the mechanical effect.
     /// </summary>
     [Serializable]
+    [UnityEngine.Scripting.APIUpdating.MovedFrom(true, "Hordebreakers", "Assembly-CSharp", null)]
     public sealed class AoeDamageEffect : AbilityEffect
     {
         [SerializeField] private float radius = 5f;

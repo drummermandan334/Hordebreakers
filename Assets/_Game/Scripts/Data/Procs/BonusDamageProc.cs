@@ -5,6 +5,7 @@ namespace Hordebreakers
 {
     /// <summary>Deals extra damage to the victim on hit — a flat amount plus a fraction of the hit, optionally heavy-only.</summary>
     [Serializable]
+    [UnityEngine.Scripting.APIUpdating.MovedFrom(true, "Hordebreakers", "Assembly-CSharp", null)]
     public sealed class BonusDamageProc : OnHitProc
     {
         [SerializeField] private float flat = 0f;

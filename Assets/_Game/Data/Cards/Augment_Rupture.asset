@@ -24,12 +24,12 @@ MonoBehaviour:
     version: 2
     RefIds:
     - rid: 8406688341614395543
-      type: {class: OnHitProcEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      type: {class: OnHitProcEffect, ns: Hordebreakers, asm: Hordebreakers}
       data:
         proc:
           rid: 8406688341614395544
     - rid: 8406688341614395544
-      type: {class: BonusDamageProc, ns: Hordebreakers, asm: Assembly-CSharp}
+      type: {class: BonusDamageProc, ns: Hordebreakers, asm: Hordebreakers}
       data:
         flat: 4
         fractionOfHit: 0

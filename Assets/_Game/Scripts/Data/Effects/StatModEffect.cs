@@ -34,6 +34,7 @@ namespace Hordebreakers
     /// clamped to DodgeDuration (the i-frame window can't outlast the dodge).
     /// </summary>
     [Serializable]
+    [UnityEngine.Scripting.APIUpdating.MovedFrom(true, "Hordebreakers", "Assembly-CSharp", null)]
     public sealed class StatModEffect : AugmentEffect
     {
         [SerializeField] private StatTarget target;

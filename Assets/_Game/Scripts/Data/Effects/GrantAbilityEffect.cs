@@ -9,6 +9,7 @@ namespace Hordebreakers
     /// it once granted.
     /// </summary>
     [Serializable]
+    [UnityEngine.Scripting.APIUpdating.MovedFrom(true, "Hordebreakers", "Assembly-CSharp", null)]
     public sealed class GrantAbilityEffect : AugmentEffect
     {
         [Tooltip("The grand ability this augment grants.")]

@@ -22,7 +22,7 @@ MonoBehaviour:
     version: 2
     RefIds:
     - rid: 8406688341614395824
-      type: {class: AoeDamageEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      type: {class: AoeDamageEffect, ns: Hordebreakers, asm: Hordebreakers}
       data:
         radius: 5
         damage: 40

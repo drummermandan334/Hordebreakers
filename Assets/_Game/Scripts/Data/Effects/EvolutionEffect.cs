@@ -11,6 +11,7 @@ namespace Hordebreakers
     /// the prerequisites from the build; it does not reverse their already-applied stat deltas.
     /// </summary>
     [Serializable]
+    [UnityEngine.Scripting.APIUpdating.MovedFrom(true, "Hordebreakers", "Assembly-CSharp", null)]
     public sealed class EvolutionEffect : AugmentEffect
     {
         [Tooltip("Every one of these augments must be owned before this can be offered.")]

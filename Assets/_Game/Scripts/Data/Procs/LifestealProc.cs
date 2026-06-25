@@ -5,6 +5,7 @@ namespace Hordebreakers
 {
     /// <summary>Heals the player for a fraction of the damage each melee hit deals.</summary>
     [Serializable]
+    [UnityEngine.Scripting.APIUpdating.MovedFrom(true, "Hordebreakers", "Assembly-CSharp", null)]
     public sealed class LifestealProc : OnHitProc
     {
         [Range(0f, 1f)]

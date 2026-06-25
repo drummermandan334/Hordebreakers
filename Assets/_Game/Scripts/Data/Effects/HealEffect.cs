@@ -5,6 +5,7 @@ namespace Hordebreakers
 {
     /// <summary>Restores player health on pick. Combines a flat amount with a fraction of max HP.</summary>
     [Serializable]
+    [UnityEngine.Scripting.APIUpdating.MovedFrom(true, "Hordebreakers", "Assembly-CSharp", null)]
     public sealed class HealEffect : AugmentEffect
     {
         [SerializeField] private float flat = 0f;

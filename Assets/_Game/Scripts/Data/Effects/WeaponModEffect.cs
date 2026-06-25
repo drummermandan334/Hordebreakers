@@ -16,6 +16,7 @@ namespace Hordebreakers
     /// No-op if the player has no throw weapon.
     /// </summary>
     [Serializable]
+    [UnityEngine.Scripting.APIUpdating.MovedFrom(true, "Hordebreakers", "Assembly-CSharp", null)]
     public sealed class WeaponModEffect : AugmentEffect
     {
         [SerializeField] private WeaponStat target;

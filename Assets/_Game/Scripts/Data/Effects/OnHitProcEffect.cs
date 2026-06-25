@@ -8,6 +8,7 @@ namespace Hordebreakers
     /// <c>[SerializeReference]</c> field, so one effect type covers every proc behavior.
     /// </summary>
     [Serializable]
+    [UnityEngine.Scripting.APIUpdating.MovedFrom(true, "Hordebreakers", "Assembly-CSharp", null)]
     public sealed class OnHitProcEffect : AugmentEffect
     {
         [SerializeReference] private OnHitProc proc;

@@ -24,6 +24,6 @@ MonoBehaviour:
     version: 2
     RefIds:
     - rid: 8406688341614395530
-      type: {class: GrantAbilityEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      type: {class: GrantAbilityEffect, ns: Hordebreakers, asm: Hordebreakers}
       data:
         ability: {fileID: 11400000, guid: 9df335ec3b6e26340bca2d52383e31a4, type: 2}
