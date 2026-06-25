@@ -27,6 +27,8 @@ namespace Hordebreakers
         [Tooltip("Rate the camera eases to stay behind the heading in FOLLOW mode. Higher = follows/snaps faster.")]
         [FormerlySerializedAs("autoFollowStrength")]
         [SerializeField] private float recenterStrength = 6f;
+        [Tooltip("Max camera swing rate (deg/sec) while following the heading — caps how fast the view whips when you turn sharply, so you don't lose your bearings. Lower = gentler/easier to track.")]
+        [SerializeField] private float followYawMaxSpeed = 130f;
         [Tooltip("Min target speed (m/s) before the stored heading updates — ignores idle jitter / in-place attacks.")]
         [SerializeField] private float headingSpeedThreshold = 0.5f;
         [Tooltip("Don't update the stored heading when movement is more backward than this (dot vs camera-forward) — keeps recenter aimed behind your last forward heading, not your face.")]
@@ -139,7 +141,10 @@ namespace Hordebreakers
             if (_followMode && _hasHeading)
             {
                 float k = 1f - Mathf.Exp(-recenterStrength * dt);
-                yaw = Mathf.LerpAngle(yaw, _headingYaw, k);
+                float easedYaw = Mathf.LerpAngle(yaw, _headingYaw, k);
+                // Cap the swing rate so a sharp turn eases the view around instead of whipping it (which loses your
+                // bearings). Small corrections still settle gently via the ease; only big, fast turns hit the cap.
+                yaw = Mathf.MoveTowardsAngle(yaw, easedYaw, followYawMaxSpeed * dt);
                 pitch = Mathf.Lerp(pitch, defaultPitch, k);
             }
             pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
