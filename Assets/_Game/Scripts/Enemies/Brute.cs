@@ -29,6 +29,8 @@ namespace Hordebreakers
         [SerializeField] private float hitFxHeight = 1.5f;
         [Tooltip("Hits at/above this damage also splash blood; every hit sparks, kills always splash.")]
         [SerializeField] private float bloodMinDamage = 20f;
+        [Tooltip("Hard minimum distance the brute keeps from the player's center (no standing inside the player). Just under player CC radius + brute radius (~0.8).")]
+        [SerializeField] private float playerSpacing = 0.7f;
 
         [Header("Animator (Speed param value + damping time)")]
         [Tooltip("Speed param while moving toward the player, and its blend damping time.")]
@@ -113,6 +115,8 @@ namespace Hordebreakers
                 return;
             }
             if (!_active || _player == null) return;
+
+            ClampOutOfPlayer();   // never stand inside the player
 
             if (_slamming) { TickSlam(dt); return; }
 
@@ -200,6 +204,14 @@ namespace Hordebreakers
                 else push += new Vector3(UnityEngine.Random.value - 0.5f, 0f, UnityEngine.Random.value - 0.5f);
             }
             return push;
+        }
+
+        /// <summary>Hard depenetration from the player's body (kinematic — the player's CharacterController can't push us out).</summary>
+        private void ClampOutOfPlayer()
+        {
+            Vector3 toEnemy = transform.position - _player.position; toEnemy.y = 0f;
+            float d = toEnemy.magnitude;
+            if (d > 0.0001f && d < playerSpacing) transform.position += toEnemy / d * (playerSpacing - d);
         }
 
         public void TakeDamage(float amount) => TakeDamage(amount, _player != null ? _player.position : transform.position - transform.forward);

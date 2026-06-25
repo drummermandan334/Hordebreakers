@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 1482134068124445769}
   - component: {fileID: 5631306810770974431}
   - component: {fileID: 5977897991015393070}
+  - component: {fileID: 6563594823347024046}
   m_Layer: 8
   m_Name: Husk
   m_TagString: Untagged
@@ -55,10 +56,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.5
-  m_Height: 1
+  m_Radius: 0.2685244
+  m_Height: 1.9489182
   m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: 0.0032081604, y: 0.8121852, z: -0.025308698}
 --- !u!114 &1482134068124445769
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -75,7 +76,8 @@ MonoBehaviour:
   animator: {fileID: 487123151603181449}
   hitFlash: {fileID: 0}
   attackTelegraph: {fileID: 0}
-  hitClip: {fileID: 8300000, guid: 089ce0173ae8ae44abaecd07ffbd6771, type: 3}
+  bloodMinDamage: 20
+  hitFxHeight: 1
   standoffRangeBase: 1.35
   standoffRangeAggressionSlope: 0.6
   attackCooldownBase: 1.4
@@ -128,6 +130,33 @@ MonoBehaviour:
   pulseHz: 5
   scalePulse: 0.05
   pulseTarget: {fileID: 0}
+--- !u!54 &6563594823347024046
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200088345215572852}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 112
+  m_CollisionDetection: 0
 --- !u!1 &2077714056716460879
 GameObject:
   m_ObjectHideFlags: 0

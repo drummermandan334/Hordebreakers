@@ -23,6 +23,8 @@ namespace Hordebreakers
         [Header("Crowd separation")]
         public float separationRadius = 0.7f;   // push apart from enemies/player within this
         public float separationForce = 6f;      // separation strength
+        [Tooltip("Hard minimum distance the body keeps from the player's center — prevents standing inside the player. Keep just under (player CC radius + this body's radius) so it doesn't fight the player's own collision.")]
+        public float playerSpacing = 0.6f;
 
         [Header("Contact damage (strike)")]
         public float contactDamage = 5f;

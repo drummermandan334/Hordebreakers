@@ -152,6 +152,8 @@ namespace Hordebreakers
                 _knockback = Vector3.Lerp(_knockback, Vector3.zero, 1f - Mathf.Exp(-knockbackDecayRate * dt));
             }
 
+            ClampOutOfPlayer();   // never stand inside the player (a CharacterController can't push a kinematic body out)
+
             if (_data.archetype == AttackArchetype.Dummy) { DummyTick(dt); return; }
 
             transform.position += Separation() * (_data.separationForce * dt);   // crowd separation: don't pile on / clip through
@@ -295,6 +297,15 @@ namespace Hordebreakers
         {
             Vector3 to = _player.position - transform.position; to.y = 0f;
             if (to.sqrMagnitude > 0.01f) modelRoot.rotation = Quaternion.LookRotation(to);
+        }
+
+        /// <summary>Hard depenetration from the player's body — kinematic enemies can't be pushed by the player's CharacterController, so we keep ourselves out of it.</summary>
+        private void ClampOutOfPlayer()
+        {
+            Vector3 toEnemy = transform.position - _player.position; toEnemy.y = 0f;
+            float min = _data != null ? _data.playerSpacing : 0.6f;
+            float d = toEnemy.magnitude;
+            if (d > 0.0001f && d < min) transform.position += toEnemy / d * (min - d);
         }
 
         /// <summary>Passive training-dummy tick: face the player and ease back to the spawn spot after a knockback. Never attacks.</summary>
