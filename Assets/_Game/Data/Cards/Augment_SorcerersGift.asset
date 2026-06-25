@@ -26,5 +26,4 @@ MonoBehaviour:
     - rid: 8406688341614395530
       type: {class: GrantAbilityEffect, ns: Hordebreakers, asm: Assembly-CSharp}
       data:
-        abilityId: arcane_nova
-        level: 1
+        ability: {fileID: 11400000, guid: 9df335ec3b6e26340bca2d52383e31a4, type: 2}

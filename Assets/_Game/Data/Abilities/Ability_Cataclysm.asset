@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 20fa5540da2b66041946a391f42087ad, type: 3}
+  m_Name: Ability_Cataclysm
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.AbilityDefinition
+  displayName: Cataclysm
+  description: A devastating shockwave that flattens everything around you.
+  cooldown: 12
+  staminaCost: 45
+  effects:
+  - rid: 8406688341614395825
+  references:
+    version: 2
+    RefIds:
+    - rid: 8406688341614395825
+      type: {class: AoeDamageEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      data:
+        radius: 8
+        damage: 90
+        forwardOffset: 0
+        shake: {x: 0.4, y: 0.4}

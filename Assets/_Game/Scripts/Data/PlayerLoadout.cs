@@ -14,7 +14,7 @@ namespace Hordebreakers
     {
         private readonly List<Augment> _taken = new List<Augment>();
         private readonly Dictionary<Augment, int> _stacks = new Dictionary<Augment, int>();
-        private readonly List<string> _grantedAbilities = new List<string>();
+        private readonly List<AbilityDefinition> _abilities = new List<AbilityDefinition>();
         private readonly List<OnHitProc> _onHitProcs = new List<OnHitProc>();
 
         public CharacterClass Class { get; }
@@ -27,7 +27,7 @@ namespace Hordebreakers
         }
 
         public IReadOnlyList<Augment> Taken => _taken;
-        public IReadOnlyList<string> GrantedAbilities => _grantedAbilities;
+        public IReadOnlyList<AbilityDefinition> Abilities => _abilities;
 
         public int StacksOf(Augment augment)
         {
@@ -69,13 +69,13 @@ namespace Hordebreakers
         }
 
         /// <summary>
-        /// Grant an ability by id. Until the ability system (Task A) exists this just records the grant so
-        /// nothing is lost and synergy can see it; later it forwards to that system.
+        /// Grant a grand ability (Task A). Added to the build so the player can cast it and synergy/draft can see
+        /// it. Deduped — re-granting the same ability is a no-op (leveling abilities is a later concern).
         /// </summary>
-        public void GrantAbility(string abilityId, int level)
+        public void GrantAbility(AbilityDefinition ability)
         {
-            if (string.IsNullOrEmpty(abilityId)) return;
-            _grantedAbilities.Add(abilityId);
+            if (ability == null || _abilities.Contains(ability)) return;
+            _abilities.Add(ability);
         }
 
         // ---------- On-hit procs ----------

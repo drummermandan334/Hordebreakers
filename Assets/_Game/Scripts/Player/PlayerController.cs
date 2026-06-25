@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -115,6 +116,8 @@ namespace Hordebreakers
         private int _armLayer = -1;        // "SwordArm" ready-stance layer; held off during attacks
 
         private readonly Collider[] _hits = new Collider[64];
+        private const int MAX_ABILITY_SLOTS = 4;
+        private readonly float[] _abilityCooldowns = new float[MAX_ABILITY_SLOTS];   // per granted-ability cooldown timers
 
         private static readonly int AnimSpeed = Animator.StringToHash("Speed");
         private static readonly int AnimLight = Animator.StringToHash("Light");
@@ -213,6 +216,9 @@ namespace Hordebreakers
             // Block is a grounded defensive stance: held, and not while attacking.
             _blocking = ReadBlockHeld() && _grounded && !inAttack;
 
+            // Grand abilities (Task A): instant-cast when not mid-swing (dodge/musou already returned above).
+            if (!inAttack) HandleAbilityInput();
+
             // Arm exactly one hit per swing the instant a NEW attack state begins (its fullPathHash changes). This ties
             // the hit to the actual swing animation — without it, chaining re-armed the hit while the animator was still
             // in the PREVIOUS swing at a late phase, so it resolved instantly on the button press with the hitbox in the
@@ -259,6 +265,7 @@ namespace Hordebreakers
             if (_dodgeCdTimer > 0f) _dodgeCdTimer -= dt;
             if (_hitReactCdTimer > 0f) _hitReactCdTimer -= dt;
             if (_dodgeTimer > 0f) _dodgeTimer -= dt;
+            for (int i = 0; i < _abilityCooldowns.Length; i++) { if (_abilityCooldowns[i] > 0f) _abilityCooldowns[i] -= dt; }
             float iFrames = data.dodgeIFrames * (_dodgeStumble ? data.stumbleDodgeIFrameMult : 1f);
             _invulnerable = _dodgeTimer > 0f && _dodgeTimer > (data.dodgeDuration - iFrames);
 
@@ -274,6 +281,51 @@ namespace Hordebreakers
             _stamina -= cost;
             _staminaRegenDelayTimer = data.staminaRegenDelay;
             return true;
+        }
+
+        // ---------- Grand abilities (Task A) ----------
+        private void HandleAbilityInput()
+        {
+            if (_loadout == null) return;
+            IReadOnlyList<AbilityDefinition> abilities = _loadout.Abilities;
+            if (abilities.Count == 0) return;
+
+            int slot = -1;
+            Gamepad pad = Gamepad.current;
+            if (Input.GetKeyDown(KeyCode.Alpha1) || (pad != null && pad.dpad.up.wasPressedThisFrame)) slot = 0;
+            else if (Input.GetKeyDown(KeyCode.Alpha2) || (pad != null && pad.dpad.left.wasPressedThisFrame)) slot = 1;
+            else if (Input.GetKeyDown(KeyCode.Alpha3) || (pad != null && pad.dpad.right.wasPressedThisFrame)) slot = 2;
+            else if (Input.GetKeyDown(KeyCode.Alpha4) || (pad != null && pad.dpad.down.wasPressedThisFrame)) slot = 3;
+            if (slot >= 0) TryActivateAbility(slot);
+        }
+
+        /// <summary>
+        /// Authoritative ability activation (the single entry point a host can drive for co-op): validates slot,
+        /// cooldown, and stamina, then casts. Returns true if it fired.
+        /// </summary>
+        public bool TryActivateAbility(int slot)
+        {
+            if (_loadout == null || slot < 0 || slot >= MAX_ABILITY_SLOTS) return false;
+            IReadOnlyList<AbilityDefinition> abilities = _loadout.Abilities;
+            if (slot >= abilities.Count) return false;
+            AbilityDefinition ability = abilities[slot];
+            if (ability == null || _abilityCooldowns[slot] > 0f) return false;
+            if (!SpendStamina(ability.staminaCost)) return false;
+            ability.Activate(this);
+            _abilityCooldowns[slot] = ability.cooldown;
+            return true;
+        }
+
+        /// <summary>Ability hook: damage every enemy within <paramref name="radius"/> of a point. Returns enemies hit.</summary>
+        public int DealAreaDamage(Vector3 center, float radius, float damage)
+        {
+            int n = Physics.OverlapSphereNonAlloc(center, radius, _hits, enemyMask);
+            int hits = 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (_hits[i].TryGetComponent(out IDamageable d) && d.IsAlive) { d.TakeDamage(damage, center); hits++; }
+            }
+            return hits;
         }
 
         private bool HasParam(string name)
