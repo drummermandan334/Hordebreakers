@@ -28,6 +28,8 @@ namespace Hordebreakers
 
         [Header("Death / Reward")]
         public float deathDuration = 1.6f;
+        [Tooltip("Recoil impulse (m/s) on the killing blow — the body slides back on death. Lower than chaff (heavy elite).")]
+        public float deathKnockback = 10f;
         public int xpValue = 10;
     }
 }

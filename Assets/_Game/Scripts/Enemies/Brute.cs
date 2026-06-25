@@ -23,6 +23,12 @@ namespace Hordebreakers
         [SerializeField] private float initialSlamCooldown = 1.5f;
         [Tooltip("Camera shake when the slam lands (x = amplitude, y = seconds).")]
         [SerializeField] private Vector2 slamShake = new Vector2(0.25f, 0.3f);
+        [Tooltip("Death-knockback decay (higher = shorter slide).")]
+        [SerializeField] private float knockbackDecayRate = 12f;
+        [Tooltip("Height above the feet where the hit spark/blood spawns (~chest of the big elite).")]
+        [SerializeField] private float hitFxHeight = 1.5f;
+        [Tooltip("Hits at/above this damage also splash blood; every hit sparks, kills always splash.")]
+        [SerializeField] private float bloodMinDamage = 20f;
 
         [Header("Animator (Speed param value + damping time)")]
         [Tooltip("Speed param while moving toward the player, and its blend damping time.")]
@@ -51,6 +57,7 @@ namespace Hordebreakers
         private Vector3 _slamPoint;
         private GameObject _telegraph;
         private float _staggerTimer;
+        private Vector3 _knockback;
         private int _separationMask;
         private static readonly Collider[] _sepHits = new Collider[16];
 
@@ -83,6 +90,8 @@ namespace Hordebreakers
             _slamHitPending = false;
             _cdTimer = initialSlamCooldown;
             _staggerTimer = 0f;
+            _knockback = Vector3.zero;
+            if (_telegraph != null) _telegraph.SetActive(false);   // never carry a stale telegraph across a pool reuse
             _separationMask = (1 << gameObject.layer) | (player != null ? (1 << player.gameObject.layer) : 0);
             if (_collider != null) _collider.enabled = true;
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
@@ -94,6 +103,11 @@ namespace Hordebreakers
 
             if (_dying)
             {
+                if (_knockback.sqrMagnitude > 0.0001f)   // ride the death knockback while the body falls
+                {
+                    transform.position += _knockback * dt;
+                    _knockback = Vector3.Lerp(_knockback, Vector3.zero, 1f - Mathf.Exp(-knockbackDecayRate * dt));
+                }
                 _deathTimer -= dt;
                 if (_deathTimer <= 0f) { _dying = false; _return?.Invoke(this); }
                 return;
@@ -195,7 +209,20 @@ namespace Hordebreakers
             if (!_active) return;
             _hp -= amount;
             if (hitFlash != null) hitFlash.Flash();
-            if (_hp <= 0f) { Die(); return; }
+            CombatAudio.PlayHit(transform.position);
+
+            // Hit VFX: spark every hit, blood on heavies/kills, at the impact point facing away from the hitter.
+            Vector3 hitDir = transform.position - sourcePos; hitDir.y = 0f;
+            if (hitDir.sqrMagnitude < 0.0001f) hitDir = modelRoot.forward;
+            hitDir = hitDir.normalized;
+            CombatVfx.Hit(transform.position + Vector3.up * hitFxHeight, hitDir, _hp <= 0f || amount >= bloodMinDamage);
+
+            if (_hp <= 0f)
+            {
+                _knockback = hitDir * (data != null ? data.deathKnockback : 10f);   // big slide-back on death
+                Die();
+                return;
+            }
             if (!_slamming && animator != null)   // reacts to every hit, but has poise mid-slam
             {
                 int dir = HitReaction.Direction(transform.position, modelRoot.forward, modelRoot.right, sourcePos);
