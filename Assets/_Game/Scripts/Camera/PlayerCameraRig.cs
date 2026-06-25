@@ -33,7 +33,7 @@ namespace Hordebreakers
         [SerializeField] private float headingSpeedThreshold = 0.5f;
         [Tooltip("Don't update the stored heading when movement is more backward than this (dot vs camera-forward) — keeps recenter aimed behind your last forward heading, not your face.")]
         [SerializeField] private float backpedalCutoff = -0.2f;
-        [Tooltip("KBM recenter key (gamepad uses R3 / right-stick click).")]
+        [Tooltip("KBM recenter key (gamepad uses L3 / left-stick click). R3 is lock-on.")]
         [SerializeField] private KeyCode recenterKey = KeyCode.Mouse2;
 
         [Header("Manual orbit (hold to look around)")]
@@ -110,42 +110,58 @@ namespace Hordebreakers
                 }
             }
 
-            // --- orbit (hold Ctrl + mouse, or gamepad right stick); recenter only on R3 / MMB ---
             float yaw = _orbit.HorizontalAxis.Value;
             float pitch = _orbit.VerticalAxis.Value;
-            bool orbiting = false;
-
-            if (Input.GetKey(orbitKey))
-            {
-                orbiting = true;
-                yaw += Input.GetAxis("Mouse X") * mouseSensitivity;
-                pitch += (invertY ? Input.GetAxis("Mouse Y") : -Input.GetAxis("Mouse Y")) * mouseSensitivity;
-            }
             Gamepad pad = Gamepad.current;
-            if (pad != null)
+
+            bool locked = TargetLock.Instance != null && TargetLock.Instance.HasTarget;
+            if (locked)
             {
-                Vector2 rs = pad.rightStick.ReadValue();
-                if (rs.sqrMagnitude > stickDeadzone * stickDeadzone)
+                // Locked: frame the focus target (look from behind the player toward it). The right stick is
+                // target-switching while locked, so no free-look. Same rate-cap as follow so it eases, not whips.
+                Vector3 toT = TargetLock.Instance.TargetPosition - _target.position; toT.y = 0f;
+                if (toT.sqrMagnitude > 0.01f)
+                {
+                    float lockYaw = Mathf.Atan2(toT.x, toT.z) * Mathf.Rad2Deg;
+                    float kk = 1f - Mathf.Exp(-recenterStrength * dt);
+                    yaw = Mathf.MoveTowardsAngle(yaw, Mathf.LerpAngle(yaw, lockYaw, kk), followYawMaxSpeed * dt);
+                    pitch = Mathf.Lerp(pitch, defaultPitch, kk);
+                }
+                _followMode = true;   // dropping the lock leaves us following, not in a stale manual hold
+            }
+            else
+            {
+                // --- orbit (hold Ctrl + mouse, or gamepad right stick); recenter on MMB / L3 ---
+                bool orbiting = false;
+                if (Input.GetKey(orbitKey))
                 {
                     orbiting = true;
-                    yaw += rs.x * gamepadLookSpeed * dt;
-                    pitch += (invertY ? rs.y : -rs.y) * gamepadLookSpeed * dt;
+                    yaw += Input.GetAxis("Mouse X") * mouseSensitivity;
+                    pitch += (invertY ? Input.GetAxis("Mouse Y") : -Input.GetAxis("Mouse Y")) * mouseSensitivity;
                 }
-            }
+                if (pad != null)
+                {
+                    Vector2 rs = pad.rightStick.ReadValue();
+                    if (rs.sqrMagnitude > stickDeadzone * stickDeadzone)
+                    {
+                        orbiting = true;
+                        yaw += rs.x * gamepadLookSpeed * dt;
+                        pitch += (invertY ? rs.y : -rs.y) * gamepadLookSpeed * dt;
+                    }
+                }
 
-            // Modes: FOLLOW (stay behind the heading, even as the character turns) vs MANUAL (hold where you
-            // put it). Recenter (R3 / MMB) enters follow; moving the camera (orbiting) drops to manual.
-            if (Input.GetKeyDown(recenterKey) || (pad != null && pad.rightStickButton.wasPressedThisFrame)) _followMode = true;
-            if (orbiting) _followMode = false;
+                // FOLLOW (stay behind the heading) vs MANUAL (hold). Recenter (MMB / L3) enters follow; orbiting drops to manual.
+                if (Input.GetKeyDown(recenterKey) || (pad != null && pad.leftStickButton.wasPressedThisFrame)) _followMode = true;
+                if (orbiting) _followMode = false;
 
-            if (_followMode && _hasHeading)
-            {
-                float k = 1f - Mathf.Exp(-recenterStrength * dt);
-                float easedYaw = Mathf.LerpAngle(yaw, _headingYaw, k);
-                // Cap the swing rate so a sharp turn eases the view around instead of whipping it (which loses your
-                // bearings). Small corrections still settle gently via the ease; only big, fast turns hit the cap.
-                yaw = Mathf.MoveTowardsAngle(yaw, easedYaw, followYawMaxSpeed * dt);
-                pitch = Mathf.Lerp(pitch, defaultPitch, k);
+                if (_followMode && _hasHeading)
+                {
+                    float k = 1f - Mathf.Exp(-recenterStrength * dt);
+                    float easedYaw = Mathf.LerpAngle(yaw, _headingYaw, k);
+                    // Cap the swing rate so a sharp turn eases the view around instead of whipping it.
+                    yaw = Mathf.MoveTowardsAngle(yaw, easedYaw, followYawMaxSpeed * dt);
+                    pitch = Mathf.Lerp(pitch, defaultPitch, k);
+                }
             }
             pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
 

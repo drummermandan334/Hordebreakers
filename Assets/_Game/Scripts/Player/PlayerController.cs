@@ -110,6 +110,7 @@ namespace Hordebreakers
         private bool _pendingHeavy, _pendingFinisher;
         private bool _swingHitResolved;    // true once the current swing has landed its hit (one hit per swing)
         private int _lastAttackStateHash;  // fullPathHash of the swing's attack state — arms one hit per swing (input-independent)
+        private bool _lockCycleArmed = true;   // re-armed when the right stick re-centers, so one flick = one target switch
         private float _verticalVel;
         private bool _grounded;
         private int _gripLayer = -1;       // "RightHandGrip" override layer; held off during attacks
@@ -198,7 +199,15 @@ namespace Hordebreakers
             _grounded = _cc.isGrounded;
             if (animator != null) animator.SetBool(AnimGrounded, _grounded);
 
-            Vector3 moveDir = ReadMoveDir();
+            HandleLockInput();   // acquire / drop / switch the focus target before movement reads it
+            bool locked = TargetLock.Instance != null && TargetLock.Instance.HasTarget;
+            Vector3 lockDir = Vector3.zero;
+            if (locked)
+            {
+                Vector3 toT = TargetLock.Instance.Target.position - transform.position; toT.y = 0f;
+                if (toT.sqrMagnitude > 0.0004f) lockDir = toT.normalized; else locked = false;
+            }
+            Vector3 moveDir = locked ? LockedMoveDir(lockDir) : ReadMoveDir();
 
             bool inAttack = InComboAttack();                                       // base layer is playing an attack clip
             // Chain only once the current swing has played comboChainOpen of its clip, so each swing animates fully.
@@ -244,7 +253,7 @@ namespace Hordebreakers
                 _comboStep = 0;
                 float bctrl = data.blockMoveSpeedMult;                             // blocking slows you — not a free turtle
                 MoveWithVertical(moveDir * data.moveSpeed * bctrl, dt);
-                if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
+                if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
                 SetAnimSpeed(moveDir.magnitude * bctrl, dt);
             }
             else
@@ -252,7 +261,7 @@ namespace Hordebreakers
                 _comboStep = 0;                                                    // back to locomotion: combo resets
                 float ctrl = _grounded ? 1f : airControl;
                 MoveWithVertical(moveDir * data.moveSpeed * ctrl, dt);
-                if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
+                if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
                 SetAnimSpeed(moveDir.magnitude, dt);
             }
 
@@ -356,7 +365,7 @@ namespace Hordebreakers
         private bool TryMusou(bool inAttack)
         {
             Gamepad pad = Gamepad.current;
-            bool pressed = Input.GetKeyDown(KeyCode.R) || (pad != null && pad.rightStickButton.wasPressedThisFrame);
+            bool pressed = Input.GetKeyDown(KeyCode.R) || (pad != null && pad.leftShoulder.wasPressedThisFrame);   // R3 freed for lock-on; Musou now R / LB
             if (!pressed || inAttack || !_grounded || _musou < data.maxMusou) return false;
             StartMusou();
             return true;
@@ -396,7 +405,7 @@ namespace Hordebreakers
             _musou = Mathf.Min(data.maxMusou, _musou + amount);
         }
 
-        private Vector3 ReadMoveDir()
+        private Vector2 ReadStick()
         {
             Vector2 mv = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
             Gamepad pad = Gamepad.current;
@@ -405,13 +414,26 @@ namespace Hordebreakers
                 Vector2 ls = pad.leftStick.ReadValue();
                 if (ls.sqrMagnitude > mv.sqrMagnitude) mv = ls;   // prefer the stronger source (KBM or pad)
             }
-            Vector3 input = new Vector3(mv.x, 0f, mv.y);
-            if (input.sqrMagnitude > 1f) input.Normalize();
-            if (_camT == null) return input;
+            if (mv.sqrMagnitude > 1f) mv.Normalize();
+            return mv;
+        }
 
+        private Vector3 ReadMoveDir()
+        {
+            Vector2 mv = ReadStick();
+            Vector3 input = new Vector3(mv.x, 0f, mv.y);
+            if (_camT == null) return input;
             Vector3 fwd = _camT.forward; fwd.y = 0f; fwd.Normalize();
             Vector3 right = _camT.right; right.y = 0f; right.Normalize();
             return right * input.x + fwd * input.z;
+        }
+
+        /// <summary>Strafe-lock movement: the stick is target-relative — up = toward the target, sideways = circle it.</summary>
+        private Vector3 LockedMoveDir(Vector3 toTargetDir)
+        {
+            Vector2 mv = ReadStick();
+            Vector3 right = Vector3.Cross(Vector3.up, toTargetDir);
+            return toTargetDir * mv.y + right * mv.x;
         }
 
         private void HandleActionInput(Vector3 moveDir, bool canAct, bool inAttack)
@@ -430,6 +452,22 @@ namespace Hordebreakers
                 if (canAct) AttackInput(heavy);          // idle, or past the chain point: swing now
                 else _bufferedAttack = heavy ? 2 : 1;    // mid-swing: buffer for the chain window
             }
+        }
+
+        /// <summary>Lock-on input: Tab / R3 toggles the focus; Q-E or a right-stick flick switches targets while locked.</summary>
+        private void HandleLockInput()
+        {
+            TargetLock tl = TargetLock.Instance;
+            if (tl == null) return;
+            Gamepad pad = Gamepad.current;
+            if (Input.GetKeyDown(KeyCode.Tab) || (pad != null && pad.rightStickButton.wasPressedThisFrame)) tl.Toggle();
+            if (!tl.HasTarget) { _lockCycleArmed = true; return; }
+
+            if (Input.GetKeyDown(KeyCode.E)) tl.Cycle(1);
+            if (Input.GetKeyDown(KeyCode.Q)) tl.Cycle(-1);
+            float flick = pad != null ? pad.rightStick.ReadValue().x : 0f;   // right stick is free while locked (no free-look)
+            if (Mathf.Abs(flick) < 0.4f) _lockCycleArmed = true;
+            else if (_lockCycleArmed && Mathf.Abs(flick) > 0.7f) { tl.Cycle(flick > 0f ? 1 : -1); _lockCycleArmed = false; }
         }
 
         // ---------- Movement ----------
@@ -621,6 +659,14 @@ namespace Hordebreakers
         /// </summary>
         private void AimFace()
         {
+            // Locked: aim straight at the focus target (the lock supersedes the aim-assist nudge).
+            if (TargetLock.Instance != null && TargetLock.Instance.HasTarget)
+            {
+                Vector3 lt = TargetLock.Instance.Target.position - transform.position; lt.y = 0f;
+                if (lt.sqrMagnitude > 0.01f) modelRoot.rotation = Quaternion.LookRotation(lt.normalized);
+                return;
+            }
+
             Vector3 dir = ReadMoveDir();
             if (dir.sqrMagnitude > 0.01f) modelRoot.rotation = Quaternion.LookRotation(dir.normalized);
 
