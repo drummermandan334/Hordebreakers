@@ -1,14 +1,13 @@
 using System;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace Hordebreakers
 {
     /// <summary>
-    /// Player-triggered thrown weapon (a Synty dagger). Reuses the pooled <see cref="Projectile"/>. Throws
-    /// toward the player's facing, snapping to the nearest enemy inside a forward cone for a little aim
-    /// assist, gated by a cooldown. Deals damage on hit.
-    /// KBM: Q.  Gamepad: Left Bumper.
+    /// The player's thrown weapon — now the battle-sorcerer's magical bolt. Reuses the pooled
+    /// <see cref="Projectile"/>. <see cref="Fire"/> is driven by PlayerController's cast (the mirrored-L3
+    /// animation), spawning from the left hand toward an aim direction, snapping to a forward-cone enemy for a
+    /// little aim assist. The cooldown lives on the player's cast gate; this just spawns.
     /// </summary>
     public class ThrowWeapon : MonoBehaviour
     {
@@ -33,7 +32,6 @@ namespace Hordebreakers
 
         private ObjectPool<Projectile> _pool;
         private Action<Projectile> _return;
-        private float _cd;
         private readonly Collider[] _hits = new Collider[64];
 
         // ---------- Upgrade hooks (driven by ThrowWeaponBuffEffect) ----------
@@ -54,19 +52,10 @@ namespace Hordebreakers
             if (aimRoot == null) aimRoot = transform;
         }
 
-        private void Update()
+        /// <summary>Spawn a bolt from <paramref name="origin"/> toward <paramref name="dir"/> (snaps to a forward-cone enemy). Driven by the player's cast.</summary>
+        public void Fire(Vector3 origin, Vector3 dir)
         {
-            if (_cd > 0f) _cd -= Time.deltaTime;
-            Gamepad pad = Gamepad.current;
-            bool throwInput = Input.GetKeyDown(KeyCode.Q) || (pad != null && pad.leftShoulder.wasPressedThisFrame);
-            if (throwInput && _cd <= 0f) Throw();
-        }
-
-        private void Throw()
-        {
-            _cd = cooldown;
-            Vector3 origin = transform.position + Vector3.up;
-            Vector3 dir = aimRoot.forward; dir.y = 0f;
+            dir.y = 0f;
             if (dir.sqrMagnitude < 0.001f) dir = transform.forward;
             dir.Normalize();
 

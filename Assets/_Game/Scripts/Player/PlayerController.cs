@@ -45,6 +45,8 @@ namespace Hordebreakers
         [Range(0f, 1f)]
         [Tooltip("Fraction of a LIGHT swing clip at which the hit lands — resolved AFTER the forward lunge, so the hitbox is where the blade visibly is (not where you stood when you pressed).")]
         [SerializeField] private float meleeContactPhase = 0.35f;
+        [Tooltip("Phase of the cast (mirrored L3) clip at which the magical bolt fires from the left hand.")]
+        [SerializeField] private float castContactPhase = 0.5f;
         [Range(0f, 1f)]
         [Tooltip("Contact phase for HEAVY swings — later, to match the heavier wind-up. KEEP IN SYNC with WeaponVfx.heavyStrikeFraction so the hit and the slash VFX land together.")]
         [SerializeField] private float heavyMeleeContactPhase = 0.5f;
@@ -111,6 +113,9 @@ namespace Hordebreakers
         private bool _swingHitResolved;    // true once the current swing has landed its hit (one hit per swing)
         private int _lastAttackStateHash;  // fullPathHash of the swing's attack state — arms one hit per swing (input-independent)
         private bool _lockCycleArmed = true;   // re-armed when the right stick re-centers, so one flick = one target switch
+        private bool _castSwing;               // the current swing is a magic-bolt cast (fires a projectile, not a melee hit)
+        private float _castCdTimer;
+        private Transform _leftHand;           // Hand_L bone — the bolt's spawn point
         private float _verticalVel;
         private bool _grounded;
         private int _gripLayer = -1;       // "RightHandGrip" override layer; held off during attacks
@@ -130,6 +135,7 @@ namespace Hordebreakers
         private static readonly int AnimHitDir = Animator.StringToHash("HitDir");
         private static readonly int AnimBlock = Animator.StringToHash("Block");
         private static readonly int AnimMusou = Animator.StringToHash("Musou");
+        private static readonly int AnimThrow = Animator.StringToHash("Throw");
 
         public bool IsAlive => _hp > 0f;
         public float HealthNormalized => data != null ? Mathf.Clamp01(_hp / data.maxHp) : 0f;
@@ -149,6 +155,7 @@ namespace Hordebreakers
             if (hitFlash == null) hitFlash = GetComponentInChildren<HitFlash>();
             _throw = GetComponentInChildren<ThrowWeapon>();
             if (animator != null) { _gripLayer = animator.GetLayerIndex("RightHandGrip"); _armLayer = animator.GetLayerIndex("SwordArm"); _hasBlockParam = HasParam("Block"); _hasMusouParam = HasParam("Musou"); }
+            if (animator != null && animator.isHuman) _leftHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
             if (data == null)
             {
                 Debug.LogError("[PlayerController] Assign a PlayerCombatData asset.", this);
@@ -239,8 +246,11 @@ namespace Hordebreakers
             {
                 // Land the swing's hit once it reaches its contact phase (after the lunge has carried us in).
                 // Heavies land later so the impact stays synced with the heavier swing's slash VFX.
-                float contactPhase = _pendingHeavy ? heavyMeleeContactPhase : meleeContactPhase;
-                if (!_swingHitResolved && AttackPhase() >= contactPhase) ResolveSwingHit();
+                float contactPhase = _castSwing ? castContactPhase : (_pendingHeavy ? heavyMeleeContactPhase : meleeContactPhase);
+                if (!_swingHitResolved && AttackPhase() >= contactPhase)
+                {
+                    if (_castSwing) ResolveCast(); else ResolveSwingHit();
+                }
 
                 // Committed to a swing: the attack's forward lunge drives movement and OVERRIDES move input;
                 // the player only gets a slight steer (no free gliding mid-attack).
@@ -275,6 +285,7 @@ namespace Hordebreakers
             if (_hitReactCdTimer > 0f) _hitReactCdTimer -= dt;
             if (_dodgeTimer > 0f) _dodgeTimer -= dt;
             for (int i = 0; i < _abilityCooldowns.Length; i++) { if (_abilityCooldowns[i] > 0f) _abilityCooldowns[i] -= dt; }
+            if (_castCdTimer > 0f) _castCdTimer -= dt;
             float iFrames = data.dodgeIFrames * (_dodgeStumble ? data.stumbleDodgeIFrameMult : 1f);
             _invulnerable = _dodgeTimer > 0f && _dodgeTimer > (data.dodgeDuration - iFrames);
 
@@ -443,6 +454,7 @@ namespace Hordebreakers
             bool dodge = Input.GetKeyDown(KeyCode.LeftShift) || (pad != null && pad.buttonEast.wasPressedThisFrame);
             bool light = Input.GetMouseButtonDown(0)         || (pad != null && pad.buttonWest.wasPressedThisFrame);
             bool heavy = Input.GetMouseButtonDown(1)         || (pad != null && (pad.buttonNorth.wasPressedThisFrame || pad.rightTrigger.wasPressedThisFrame));
+            bool cast  = Input.GetKeyDown(KeyCode.Q)         || (pad != null && pad.rightShoulder.wasPressedThisFrame);   // magical bolt (Q / RB)
 
             if (dodge && _dodgeCdTimer <= 0f) { _bufferedAttack = 0; StartDodge(moveDir); return; }   // dodge cancels a swing
             if (jump && _grounded && !inAttack) DoJump();                     // no jump-canceling a swing
@@ -452,6 +464,16 @@ namespace Hordebreakers
                 if (canAct) AttackInput(heavy);          // idle, or past the chain point: swing now
                 else _bufferedAttack = heavy ? 2 : 1;    // mid-swing: buffer for the chain window
             }
+            else if (cast && canAct && _castCdTimer <= 0f) CastInput();   // bolt only when free to act (not mid-swing)
+        }
+
+        /// <summary>Begin a magic-bolt cast: the mirrored-L3 thrust; the bolt fires from the left hand at the contact phase.</summary>
+        private void CastInput()
+        {
+            _castSwing = true;
+            _castCdTimer = _throw != null ? _throw.Cooldown : 0.55f;
+            AimFace();
+            if (animator != null) animator.SetTrigger(AnimThrow);
         }
 
         /// <summary>Lock-on input: Tab / R3 toggles the focus; Q-E or a right-stick flick switches targets while locked.</summary>
@@ -463,8 +485,8 @@ namespace Hordebreakers
             if (Input.GetKeyDown(KeyCode.Tab) || (pad != null && pad.rightStickButton.wasPressedThisFrame)) tl.Toggle();
             if (!tl.HasTarget) { _lockCycleArmed = true; return; }
 
-            if (Input.GetKeyDown(KeyCode.E)) tl.Cycle(1);
-            if (Input.GetKeyDown(KeyCode.Q)) tl.Cycle(-1);
+            float scroll = Input.mouseScrollDelta.y;   // mouse wheel switches targets (KBM); Q is the bolt now
+            if (scroll > 0.1f) tl.Cycle(1); else if (scroll < -0.1f) tl.Cycle(-1);
             float flick = pad != null ? pad.rightStick.ReadValue().x : 0f;   // right stick is free while locked (no free-look)
             if (Mathf.Abs(flick) < 0.4f) _lockCycleArmed = true;
             else if (_lockCycleArmed && Mathf.Abs(flick) > 0.7f) { tl.Cycle(flick > 0f ? 1 : -1); _lockCycleArmed = false; }
@@ -589,6 +611,7 @@ namespace Hordebreakers
             float cost = heavy ? data.heavyStaminaCost : data.lightStaminaCost;
             if (!SpendStamina(cost)) return;   // too tired to swing — movement is free, so reposition while stamina regens
 
+            _castSwing = false;   // a melee swing clears any pending cast
             CombatAudio.PlaySwing(transform.position);   // swing whoosh (clips live on CombatAudio)
             _comboStep = (InComboAttack() && _comboStep < 3) ? _comboStep + 1 : 1;   // chaining advances the slot; a fresh attack resets it
             AimFace();
@@ -611,6 +634,18 @@ namespace Hordebreakers
             _swingHitResolved = true;
             int hits = MeleeHit(_pendingReach, _pendingDamage);
             if (hits > 0 || (_pendingHeavy && _pendingFinisher)) HitJuice(_pendingFinisher);
+        }
+
+        /// <summary>Fires the magical bolt from the left hand at the cast's contact phase (the mirrored L3 thrust).</summary>
+        private void ResolveCast()
+        {
+            _swingHitResolved = true;
+            if (_throw == null) return;
+            Vector3 origin = _leftHand != null ? _leftHand.position : transform.position + Vector3.up;
+            Vector3 dir = (TargetLock.Instance != null && TargetLock.Instance.HasTarget)
+                ? TargetLock.Instance.TargetPosition - origin
+                : modelRoot.forward;
+            _throw.Fire(origin, dir);
         }
 
         // ---------- FX / feedback ----------

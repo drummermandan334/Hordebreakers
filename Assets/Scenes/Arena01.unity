@@ -791,6 +791,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2220684667958290512, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: projectilePrefab
+      value: 
+      objectReference: {fileID: 6593878466774560296, guid: 9d5b407ae11d94b46b63c3f436e0f397, type: 3}
     - target: {fileID: 2640086284420860344, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -3738,6 +3742,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1836245096}
     m_Modifications:
+    - target: {fileID: 175175724983342716, guid: 7c5a4f45b84b97b49afeba568d636962, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 175175724983342716, guid: 7c5a4f45b84b97b49afeba568d636962, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 175175724983342716, guid: 7c5a4f45b84b97b49afeba568d636962, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1384280946776679044, guid: 7c5a4f45b84b97b49afeba568d636962, type: 3}
       propertyPath: m_Pivot.x
       value: 0
