@@ -26,10 +26,6 @@ namespace Hordebreakers
         [Tooltip("How long a hit staggers the brute when it's not slamming.")]
         public float hitReactTime = 0.3f;
 
-        [Header("Marks")]
-        public int markMaxStacks = 20;
-        public float markDecayTime = 5f;
-
         [Header("Death / Reward")]
         public float deathDuration = 1.6f;
         public int xpValue = 10;

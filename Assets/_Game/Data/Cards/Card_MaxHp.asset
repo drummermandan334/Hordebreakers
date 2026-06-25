@@ -13,6 +13,21 @@ MonoBehaviour:
   m_Name: Card_MaxHp
   m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.UpgradeCard
   title: Vitality
-  description: Max health +25 and heal
-  type: 6
-  magnitude: 25
+  description: Max health +25, and heal for the same.
+  rarity: 1
+  allowedClasses: -1
+  tags: 2
+  maxStacks: 0
+  effects:
+  - rid: 8406688341614395526
+  references:
+    version: 2
+    RefIds:
+    - rid: 8406688341614395526
+      type: {class: StatModEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      data:
+        target: 0
+        op: 0
+        amount: 25
+        synergyTag: 0
+        perStack: 0

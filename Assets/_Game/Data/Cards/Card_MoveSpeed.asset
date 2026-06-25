@@ -13,6 +13,21 @@ MonoBehaviour:
   m_Name: Card_MoveSpeed
   m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.UpgradeCard
   title: Fleet Footed
-  description: Move speed +0.8
-  type: 5
-  magnitude: 0.8
+  description: Move speed +0.8.
+  rarity: 0
+  allowedClasses: -1
+  tags: 4
+  maxStacks: 0
+  effects:
+  - rid: 8406688341614395527
+  references:
+    version: 2
+    RefIds:
+    - rid: 8406688341614395527
+      type: {class: StatModEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      data:
+        target: 1
+        op: 0
+        amount: 0.8
+        synergyTag: 0
+        perStack: 0

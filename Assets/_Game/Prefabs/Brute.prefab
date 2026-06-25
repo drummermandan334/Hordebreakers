@@ -10,9 +10,9 @@ GameObject:
   m_Component:
   - component: {fileID: 6579342554150468179}
   - component: {fileID: 1068703545225794631}
-  - component: {fileID: 6929412099081450659}
   - component: {fileID: 294695954849416385}
   - component: {fileID: 6677229396564515604}
+  - component: {fileID: 238418305063605962}
   m_Layer: 8
   m_Name: Brute
   m_TagString: Untagged
@@ -59,20 +59,6 @@ CapsuleCollider:
   m_Height: 1.8
   m_Direction: 1
   m_Center: {x: 0, y: 0.9, z: 0}
---- !u!114 &6929412099081450659
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3702476644687103685}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 69e785a6509bf6345be8c1e012cf650b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.Markable
-  markRenderer: {fileID: 3692013588630525645}
-  markColor: {r: 1, g: 0.5, b: 0, a: 1}
 --- !u!114 &294695954849416385
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -90,6 +76,13 @@ MonoBehaviour:
   animator: {fileID: 3713331247831748175}
   telegraphPrefab: {fileID: 5824459731364133036, guid: 581c2b7747054674388a1438ddfad8cd, type: 3}
   hitFlash: {fileID: 0}
+  attackTelegraph: {fileID: 0}
+  initialSlamCooldown: 1.5
+  slamShake: {x: 0.25, y: 0.3}
+  animSpeedMove: 1
+  animDampMove: 0.15
+  animDampStop: 0.1
+  fallbackDeathDuration: 1.6
 --- !u!114 &6677229396564515604
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -102,11 +95,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4cde4ed0edf828449c943101ffecb10, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.HitFlash
-  flashColor: {r: 1, g: 0.3, b: 0.3, a: 1}
-  flashDuration: 0.09
-  emissionIntensity: 3.5
-  scalePunch: 0.12
+  flashColor: {r: 1, g: 0.28, b: 0.22, a: 1}
+  flashDuration: 0.13
+  emissionIntensity: 5.5
+  scalePunch: 0.2
   punchTarget: {fileID: 0}
+--- !u!114 &238418305063605962
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3702476644687103685}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afd79dcc4b240c548ac4c1d9ee1afad9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.AttackTelegraph
+  telegraphColor: {r: 1, g: 0.45, b: 0.1, a: 1}
+  emissionIntensity: 2.6
+  pulseHz: 5
+  scalePulse: 0.05
+  pulseTarget: {fileID: 0}
 --- !u!1 &4415120667983190380
 GameObject:
   m_ObjectHideFlags: 0
@@ -397,11 +407,6 @@ MonoBehaviour:
     socket: {fileID: 7615333832078081138}
     rotationOffset: {x: -0.0000030041715, y: 0.000003207736, z: 270.14746}
     scale: 0.99999976
---- !u!137 &3692013588630525645 stripped
-SkinnedMeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 137341390338042718, guid: cb4ff29f6f657bc4d94ed49c50a70be2, type: 3}
-  m_PrefabInstance: {fileID: 3664599173962038675}
-  m_PrefabAsset: {fileID: 0}
 --- !u!95 &3713331247831748175 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 95458022740784092, guid: cb4ff29f6f657bc4d94ed49c50a70be2, type: 3}

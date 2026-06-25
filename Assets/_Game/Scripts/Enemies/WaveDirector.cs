@@ -13,8 +13,18 @@ namespace Hordebreakers
         [Header("Refs")]
         [SerializeField] private Enemy huskPrefab;
         [SerializeField] private EnemyData huskData;
+        [Tooltip("Charger variant data (archetype = Charger). Spawns from the same Husk pool, just Init'd with this.")]
+        [SerializeField] private EnemyData chargerData;
         [SerializeField] private Brute brutePrefab;
         [SerializeField] private Transform player;
+
+        [Header("Training mode (feel testing: ONE passive dummy, no waves/attacks)")]
+        [SerializeField] private bool trainingMode = false;
+        [SerializeField] private EnemyData dummyData;
+        [Tooltip("Fixed, in-arena spawn for the dummy. If set, the dummy always respawns here (so it never ends up outside a wall). Falls back to in-front-of-player if unset.")]
+        [SerializeField] private Transform dummySpawnPoint;
+        [SerializeField] private float dummySpawnDistance = 4.5f;
+        [SerializeField] private float dummyRespawnDelay = 1.5f;
 
         [Header("Spawn")]
         [SerializeField] private float spawnRadius = 18f;
@@ -28,6 +38,9 @@ namespace Hordebreakers
         [SerializeField] private float baseSpawnInterval = 1.2f;
         [SerializeField] private float spawnIntervalWaveMult = 0.85f;   // each wave spawns faster
         [SerializeField] private float minSpawnInterval = 0.18f;
+        [Tooltip("From this wave on, a fraction of crowd spawns become Chargers (telegraphed dashers).")]
+        [SerializeField] private int firstChargerWave = 2;
+        [Range(0f, 1f)] [SerializeField] private float chargerChance = 0.25f;
         [SerializeField] private int firstBruteWave = 2;
         [Tooltip("Delay after a wave starts before the first Brute is injected (waves at/after firstBruteWave).")]
         [SerializeField] private float bruteFirstSpawnDelay = 3f;
@@ -44,6 +57,8 @@ namespace Hordebreakers
 
         private int _wave;
         private bool _inBreather;
+        private Enemy _dummy;
+        private float _dummyRespawnTimer;
         private float _phaseTimer;
         private float _spawnTimer;
         private float _bruteTimer;
@@ -70,12 +85,19 @@ namespace Hordebreakers
             }
         }
 
-        private void Start() => StartWave(1);
+        private void Start()
+        {
+            if (trainingMode) SpawnDummy();
+            else StartWave(1);
+        }
 
         private void Update()
         {
             if (player == null) return;
             float dt = Time.deltaTime;
+
+            if (trainingMode) { TickTraining(dt); return; }
+
             _phaseTimer -= dt;
 
             if (_inBreather)
@@ -124,6 +146,8 @@ namespace Hordebreakers
         {
             _inBreather = true;
             _phaseTimer = breatherDuration;
+            // Wave cleared → resolve any banked level-up augment picks (between encounters, not mid-fight).
+            if (GameManager.Instance != null) GameManager.Instance.ResolvePendingAtBreather();
         }
 
         private Vector3 RingPoint()
@@ -132,11 +156,34 @@ namespace Hordebreakers
             return player.position + new Vector3(c.x, 0f, c.y);
         }
 
+        // ---------- Training mode (feel testing) ----------
+        private void TickTraining(float dt)
+        {
+            if (_dummy != null && _dummy.IsAlive) return;   // keep exactly one dummy alive
+            _dummyRespawnTimer -= dt;
+            if (_dummyRespawnTimer <= 0f) SpawnDummy();
+        }
+
+        private void SpawnDummy()
+        {
+            if (dummyData == null) return;
+            Enemy e = _huskPool.Get();
+            Vector3 p = dummySpawnPoint != null
+                ? dummySpawnPoint.position                                   // fixed, in-arena spawn (never ends up outside a wall)
+                : player.position + player.forward * dummySpawnDistance;     // fallback: in front of the player
+            e.transform.position = p;
+            e.Init(dummyData, player, _huskReturn);
+            _dummy = e;
+            _dummyRespawnTimer = dummyRespawnDelay;
+        }
+
         private void SpawnHusk()
         {
             Enemy e = _huskPool.Get();
             e.transform.position = RingPoint();
-            e.Init(huskData, player, _huskReturn);
+            // Same pool/prefab; a fraction roll as Chargers, reconfigured purely by their EnemyData archetype.
+            bool charger = chargerData != null && _wave >= firstChargerWave && UnityEngine.Random.value < chargerChance;
+            e.Init(charger ? chargerData : huskData, player, _huskReturn);
             _huskAlive++;
         }
 

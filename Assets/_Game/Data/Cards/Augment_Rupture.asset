@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: efd89a358890cf44c98ea44e2c471280, type: 3}
+  m_Name: Augment_Rupture
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.Augment
+  title: Rupture
+  description: Heavy hits deal +4 bonus damage.
+  rarity: 1
+  allowedClasses: -1
+  tags: 1
+  maxStacks: 0
+  effects:
+  - rid: 8406688341614395543
+  references:
+    version: 2
+    RefIds:
+    - rid: 8406688341614395543
+      type: {class: OnHitProcEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      data:
+        proc:
+          rid: 8406688341614395544
+    - rid: 8406688341614395544
+      type: {class: BonusDamageProc, ns: Hordebreakers, asm: Assembly-CSharp}
+      data:
+        flat: 4
+        fractionOfHit: 0
+        heavyOnly: 1

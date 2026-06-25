@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c76e8bca0ef64ec48b1e0fa5c81c9bc2, type: 3}
+  m_Name: DummyData
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.EnemyData
+  archetype: 2
+  maxHp: 150
+  moveSpeed: 2.5
+  separationRadius: 0
+  separationForce: 0
+  contactDamage: 5
+  contactInterval: 1
+  contactRange: 1.4
+  attackRange: 1.8
+  attackWindup: 0.45
+  attackRecovery: 0.45
+  attackCooldown: 1.6
+  lungeSpeed: 8
+  lungeTime: 0.14
+  chargeStartRange: 9
+  chargeWindup: 0.7
+  chargeSpeed: 16
+  chargeTime: 0.55
+  chargeDamage: 14
+  chargeRecovery: 0.9
+  chargeHitRadius: 1.3
+  knockback: 2.5
+  knockbackPerDamage: 0.3
+  hitReactTime: 0.12
+  deathDuration: 1.1
+  xpValue: 0

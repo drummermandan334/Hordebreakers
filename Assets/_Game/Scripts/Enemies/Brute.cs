@@ -6,9 +6,9 @@ namespace Hordebreakers
     /// <summary>
     /// Pooled elite. Slow seek; when the player is close it commits to a telegraphed slam
     /// (ground decal during the windup = the dodge window), then deals AoE damage at that spot.
-    /// High HP and markable, so the reward loop is: dodge the slam, then detonate it.
+    /// High HP, so the reward loop is: dodge the slam, then punish the recovery.
     /// </summary>
-    [RequireComponent(typeof(Markable), typeof(CapsuleCollider))]
+    [RequireComponent(typeof(CapsuleCollider))]
     public class Brute : MonoBehaviour, IDamageable
     {
         [SerializeField] private EliteData data;
@@ -16,6 +16,7 @@ namespace Hordebreakers
         [SerializeField] private Animator animator;
         [SerializeField] private GameObject telegraphPrefab;
         [SerializeField] private HitFlash hitFlash;
+        [SerializeField] private AttackTelegraph attackTelegraph;   // wind-up glow tell (auto-found)
 
         [Header("Tuning")]
         [Tooltip("Grace period before the elite can slam after spawning.")]
@@ -34,7 +35,6 @@ namespace Hordebreakers
         [Tooltip("Death animation duration used only if EliteData is missing (normally data.deathDuration).")]
         [SerializeField] private float fallbackDeathDuration = 1.6f;
 
-        private Markable _mark;
         private CapsuleCollider _collider;
         private Transform _player;
         private IDamageable _playerDmg;
@@ -58,16 +58,17 @@ namespace Hordebreakers
         private static readonly int AnimDead = Animator.StringToHash("Dead");
         private static readonly int AnimAttack = Animator.StringToHash("Attack");
         private static readonly int AnimHit = Animator.StringToHash("Hit");
+        private static readonly int AnimHitDir = Animator.StringToHash("HitDir");
 
         public bool IsAlive => _active && _hp > 0f;
 
         private void Awake()
         {
-            _mark = GetComponent<Markable>();
             _collider = GetComponent<CapsuleCollider>();
             if (modelRoot == null) modelRoot = transform;
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (hitFlash == null) hitFlash = GetComponentInChildren<HitFlash>();
+            if (attackTelegraph == null) attackTelegraph = GetComponentInChildren<AttackTelegraph>();
         }
 
         public void Init(Transform player, Action<Brute> ret)
@@ -84,8 +85,6 @@ namespace Hordebreakers
             _staggerTimer = 0f;
             _separationMask = (1 << gameObject.layer) | (player != null ? (1 << player.gameObject.layer) : 0);
             if (_collider != null) _collider.enabled = true;
-            _mark.Configure(data.markMaxStacks, data.markDecayTime);
-            _mark.ClearMarks();
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
         }
 
@@ -129,13 +128,18 @@ namespace Hordebreakers
             _slamPoint = _player.position;
 
             if (animator != null) { animator.SetFloat(AnimSpeed, 0f); animator.SetTrigger(AnimAttack); }
+            if (attackTelegraph != null) attackTelegraph.Begin(data.slamWindup);   // glow only during the dodge window
             Vector3 d = _slamPoint - transform.position; d.y = 0f;
             if (d.sqrMagnitude > 0.01f) modelRoot.rotation = Quaternion.LookRotation(d);
 
             if (telegraphPrefab != null)
             {
-                _telegraph = Instantiate(telegraphPrefab, _slamPoint + Vector3.up * 0.02f, Quaternion.identity);
+                // Reuse one telegraph instance per brute instead of Instantiate/Destroy each slam (no per-slam GC).
+                if (_telegraph == null) _telegraph = Instantiate(telegraphPrefab);
+                _telegraph.transform.position = _slamPoint + Vector3.up * 0.02f;
+                _telegraph.transform.rotation = Quaternion.identity;
                 _telegraph.transform.localScale = new Vector3(data.slamRadius * 2f, 0.05f, data.slamRadius * 2f);
+                _telegraph.SetActive(true);
             }
         }
 
@@ -147,21 +151,21 @@ namespace Hordebreakers
             if (_slamHitPending && since >= data.slamWindup)
             {
                 _slamHitPending = false;
-                if (_telegraph != null) Destroy(_telegraph);
+                if (_telegraph != null) _telegraph.SetActive(false);   // telegraph clears at the moment of impact
 
                 if (_player != null && _playerDmg != null && _playerDmg.IsAlive)
                 {
                     Vector3 d = _player.position - _slamPoint; d.y = 0f;
-                    if (d.magnitude <= data.slamRadius) _playerDmg.TakeDamage(data.slamDamage);
+                    if (d.magnitude <= data.slamRadius) _playerDmg.TakeDamage(data.slamDamage, transform.position);
                 }
-                if (ThirdPersonCamera.Instance != null) ThirdPersonCamera.Instance.Shake(slamShake.x, slamShake.y);
+                PlayerCameraRig.Shake(slamShake.x, slamShake.y);
             }
 
             if (_slamTimer <= 0f)
             {
                 _slamming = false;
                 _cdTimer = data.slamCooldown;
-                if (_telegraph != null) Destroy(_telegraph);
+                if (_telegraph != null) _telegraph.SetActive(false);
             }
         }
 
@@ -184,7 +188,9 @@ namespace Hordebreakers
             return push;
         }
 
-        public void TakeDamage(float amount)
+        public void TakeDamage(float amount) => TakeDamage(amount, _player != null ? _player.position : transform.position - transform.forward);
+
+        public void TakeDamage(float amount, Vector3 sourcePos)
         {
             if (!_active) return;
             _hp -= amount;
@@ -192,6 +198,8 @@ namespace Hordebreakers
             if (_hp <= 0f) { Die(); return; }
             if (!_slamming && animator != null)   // reacts to every hit, but has poise mid-slam
             {
+                int dir = HitReaction.Direction(transform.position, modelRoot.forward, modelRoot.right, sourcePos);
+                animator.SetInteger(AnimHitDir, dir);
                 animator.SetTrigger(AnimHit);
                 _staggerTimer = data.hitReactTime;
             }
@@ -203,7 +211,7 @@ namespace Hordebreakers
             _dying = true;
             _deathTimer = data != null ? data.deathDuration : fallbackDeathDuration;
             if (_collider != null) _collider.enabled = false;
-            if (_telegraph != null) Destroy(_telegraph);
+            if (_telegraph != null) _telegraph.SetActive(false);   // keep the instance; reused when this brute respawns from the pool
             if (animator != null) animator.SetTrigger(AnimDead);
             if (GameManager.Instance != null)
             {

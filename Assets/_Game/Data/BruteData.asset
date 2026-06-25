@@ -14,13 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.EliteData
   maxHp: 120
   moveSpeed: 2.2
+  separationRadius: 1.1
+  separationForce: 6
   slamRange: 3.5
   slamRadius: 3.5
   slamDamage: 35
   slamWindup: 1.1
   slamRecovery: 0.8
   slamCooldown: 2.5
-  markMaxStacks: 20
-  markDecayTime: 5
+  hitReactTime: 0.12
   deathDuration: 1.6
   xpValue: 10

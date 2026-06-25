@@ -9,7 +9,7 @@ namespace Hordebreakers
     /// telegraphed LUNGE — windup (the dodge window) → forward dash strike → recovery → cooldown.
     /// Kinematic (no NavMesh/Rigidbody for the prototype). Flashes on hit; returns to its pool on death.
     /// </summary>
-    [RequireComponent(typeof(Markable), typeof(CapsuleCollider))]
+    [RequireComponent(typeof(CapsuleCollider))]
     public class Enemy : MonoBehaviour, IDamageable
     {
         private enum State { Seek, Windup, Lunge, Recover }
@@ -17,6 +17,11 @@ namespace Hordebreakers
         [SerializeField] private Transform modelRoot;
         [SerializeField] private Animator animator;
         [SerializeField] private HitFlash hitFlash;
+        [SerializeField] private AttackTelegraph attackTelegraph;   // wind-up glow tell (auto-found)
+        [Tooltip("Hits at/above this damage also splash blood (heavies). Every hit sparks; kills always splash.")]
+        [SerializeField] private float bloodMinDamage = 20f;
+        [Tooltip("Height above the enemy's feet where the hit spark/blood spawns (~chest).")]
+        [SerializeField] private float hitFxHeight = 1f;
 
         [Header("Aggression (per-instance variety, derived from a 0..1 roll)")]
         [Tooltip("Standoff ring = attackRange * (base - slope * aggression). Aggressive enemies crowd in closer.")]
@@ -58,7 +63,6 @@ namespace Hordebreakers
         [SerializeField] private float fallbackDeathDuration = 1.1f;
 
         private EnemyData _data;
-        private Markable _mark;
         private CapsuleCollider _collider;
         private Transform _player;
         private IDamageable _playerDmg;
@@ -79,6 +83,7 @@ namespace Hordebreakers
         private float _attackCd;       // per-instance attack cooldown (from aggression)
         private Vector3 _lungeDir;
         private Vector3 _knockback;    // hit-recoil impulse
+        private Vector3 _homePos;      // spawn position a Dummy eases back to between hits
         private float _staggerTimer;   // > 0 while flinching from a hit (movement paused)
         private int _separationMask;   // enemy + player layers, for crowd separation
         private static readonly Collider[] _sepHits = new Collider[16];
@@ -87,16 +92,17 @@ namespace Hordebreakers
         private static readonly int AnimDead = Animator.StringToHash("Dead");
         private static readonly int AnimAttack = Animator.StringToHash("Attack");
         private static readonly int AnimHit = Animator.StringToHash("Hit");
+        private static readonly int AnimHitDir = Animator.StringToHash("HitDir");
 
         public bool IsAlive => _active && _hp > 0f;
 
         private void Awake()
         {
-            _mark = GetComponent<Markable>();
             _collider = GetComponent<CapsuleCollider>();
             if (modelRoot == null) modelRoot = transform;
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (hitFlash == null) hitFlash = GetComponentInChildren<HitFlash>();
+            if (attackTelegraph == null) attackTelegraph = GetComponentInChildren<AttackTelegraph>();
         }
 
         public void Init(EnemyData data, Transform player, Action<Enemy> returnToPool)
@@ -106,6 +112,7 @@ namespace Hordebreakers
             _returnToPool = returnToPool;
             _playerDmg = player != null ? player.GetComponent<IDamageable>() : null;
             _hp = data.maxHp;
+            _homePos = transform.position;
             _active = true;
             _dying = false;
             _state = State.Seek;
@@ -119,8 +126,6 @@ namespace Hordebreakers
             _staggerTimer = 0f;
             _separationMask = (1 << gameObject.layer) | (player != null ? (1 << player.gameObject.layer) : 0);
             if (_collider != null) _collider.enabled = true;
-            _mark.Configure(data.markMaxStacks, data.markDecayTime);
-            _mark.ClearMarks();
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
         }
 
@@ -130,6 +135,11 @@ namespace Hordebreakers
 
             if (_dying)
             {
+                if (_knockback.sqrMagnitude > 0.0001f)   // ride the big death knockback while the body falls
+                {
+                    transform.position += _knockback * dt;
+                    _knockback = Vector3.Lerp(_knockback, Vector3.zero, 1f - Mathf.Exp(-knockbackDecayRate * dt));
+                }
                 _deathTimer -= dt;
                 if (_deathTimer <= 0f) { _dying = false; _returnToPool?.Invoke(this); }
                 return;
@@ -141,6 +151,8 @@ namespace Hordebreakers
                 transform.position += _knockback * dt;
                 _knockback = Vector3.Lerp(_knockback, Vector3.zero, 1f - Mathf.Exp(-knockbackDecayRate * dt));
             }
+
+            if (_data.archetype == AttackArchetype.Dummy) { DummyTick(dt); return; }
 
             transform.position += Separation() * (_data.separationForce * dt);   // crowd separation: don't pile on / clip through
 
@@ -158,6 +170,8 @@ namespace Hordebreakers
 
         private void TickSeek(float dt)
         {
+            if (_data.archetype == AttackArchetype.Charger) { TickChargerSeek(dt); return; }
+
             Vector3 fromPlayer = transform.position - _player.position; fromPlayer.y = 0f;
             float dist = fromPlayer.magnitude;
             Vector3 dirFromPlayer = dist > 0.001f ? fromPlayer / dist : modelRoot.forward;
@@ -183,6 +197,7 @@ namespace Hordebreakers
                 _state = State.Windup;
                 _stateTimer = _data.attackWindup;
                 if (animator != null) animator.SetTrigger(AnimAttack);
+                if (attackTelegraph != null) attackTelegraph.Begin(_data.attackWindup);
                 return;
             }
 
@@ -203,26 +218,66 @@ namespace Hordebreakers
                 _lungeDir = to.sqrMagnitude > 0.001f ? to.normalized : modelRoot.forward;
                 modelRoot.rotation = Quaternion.LookRotation(_lungeDir);
                 _state = State.Lunge;
-                _stateTimer = _data.lungeTime;
+                _stateTimer = _data.archetype == AttackArchetype.Charger ? _data.chargeTime : _data.lungeTime;
             }
         }
 
         private void TickLunge(float dt)
         {
-            transform.position += _lungeDir * _data.lungeSpeed * dt;
+            bool charger = _data.archetype == AttackArchetype.Charger;
+            float speed = charger ? _data.chargeSpeed : _data.lungeSpeed;
+            transform.position += _lungeDir * speed * dt;
+
+            // Charger: sweep-connect mid-dash (a fast charge passes THROUGH the player, so don't only check the end).
+            if (charger && _playerDmg != null && _playerDmg.IsAlive)
+            {
+                Vector3 toP = _player.position - transform.position; toP.y = 0f;
+                if (toP.magnitude <= _data.chargeHitRadius)
+                {
+                    _playerDmg.TakeDamage(_data.chargeDamage, transform.position);
+                    _state = State.Recover;
+                    _stateTimer = _data.chargeRecovery;
+                    return;
+                }
+            }
+
             _stateTimer -= dt;
             if (_stateTimer <= 0f)
             {
-                // connect if the player is still in front and within reach
-                if (_playerDmg != null && _playerDmg.IsAlive)
+                // Standoff lunge connects if the player is still in front and within reach (charger already swept above).
+                if (!charger && _playerDmg != null && _playerDmg.IsAlive)
                 {
                     Vector3 to = _player.position - transform.position; to.y = 0f;
                     if (to.magnitude <= _standoff * lungeConnectReachMult)
-                        _playerDmg.TakeDamage(_data.contactDamage);
+                        _playerDmg.TakeDamage(_data.contactDamage, transform.position);
                 }
                 _state = State.Recover;
-                _stateTimer = _data.attackRecovery;
+                _stateTimer = charger ? _data.chargeRecovery : _data.attackRecovery;
             }
+        }
+
+        /// <summary>Charger seek: rush straight at the player (no standoff ring), then telegraph a long committed charge.</summary>
+        private void TickChargerSeek(float dt)
+        {
+            Vector3 to = _player.position - transform.position; to.y = 0f;
+            float dist = to.magnitude;
+            FacePlayer();
+
+            if (_cooldownTimer <= 0f && dist <= _data.chargeStartRange)
+            {
+                _state = State.Windup;
+                _stateTimer = _data.chargeWindup;
+                if (animator != null) animator.SetTrigger(AnimAttack);
+                if (attackTelegraph != null) attackTelegraph.Begin(_data.chargeWindup);
+                return;
+            }
+
+            if (dist > 0.05f)
+            {
+                Vector3 dir = to / dist;
+                transform.position += dir * _data.moveSpeed * dt;
+            }
+            if (animator != null) animator.SetFloat(AnimSpeed, animSpeedApproach, animDampApproach, dt);
         }
 
         private void TickRecover(float dt)
@@ -240,6 +295,20 @@ namespace Hordebreakers
         {
             Vector3 to = _player.position - transform.position; to.y = 0f;
             if (to.sqrMagnitude > 0.01f) modelRoot.rotation = Quaternion.LookRotation(to);
+        }
+
+        /// <summary>Passive training-dummy tick: face the player and ease back to the spawn spot after a knockback. Never attacks.</summary>
+        private void DummyTick(float dt)
+        {
+            FacePlayer();
+            if (_staggerTimer > 0f)
+            {
+                _staggerTimer -= dt;
+                if (animator != null) animator.SetFloat(AnimSpeed, 0f, animDampStop, dt);
+                return;
+            }
+            // Stand where it's knocked — no auto-return — so the knockback from each hit stays readable.
+            if (animator != null) animator.SetFloat(AnimSpeed, 0f, animDampStop, dt);
         }
 
         /// <summary>Push-away from nearby enemies + the player so the crowd spaces out (kinematic, no physics).</summary>
@@ -261,19 +330,31 @@ namespace Hordebreakers
             return push;
         }
 
-        public void TakeDamage(float amount)
+        // Damage from an unknown source recoils away from the player (the usual melee attacker).
+        public void TakeDamage(float amount) => TakeDamage(amount, _player != null ? _player.position : transform.position - transform.forward);
+
+        public void TakeDamage(float amount, Vector3 sourcePos)
         {
             if (!_active) return;
             _hp -= amount;
             if (hitFlash != null) hitFlash.Flash();
-            if (_player != null && _data != null)
+            CombatAudio.PlayHit(transform.position);   // impact thunk (clips live on CombatAudio)
+
+            // Hit VFX: spark every hit, blood on heavies/kills, at the impact point facing away from the hitter.
+            Vector3 hitDir = transform.position - sourcePos; hitDir.y = 0f;
+            if (hitDir.sqrMagnitude < 0.0001f) hitDir = modelRoot.forward;
+            CombatVfx.Hit(transform.position + Vector3.up * hitFxHeight, hitDir.normalized, _hp <= 0f || amount >= bloodMinDamage);
+            if (_data != null)
             {
-                Vector3 kb = transform.position - _player.position; kb.y = 0f;
-                if (kb.sqrMagnitude > 0.001f) _knockback = kb.normalized * _data.knockback;
+                Vector3 kb = transform.position - sourcePos; kb.y = 0f;   // recoil away from the hit source
+                if (kb.sqrMagnitude > 0.001f) _knockback = kb.normalized * (_data.knockback + amount * _data.knockbackPerDamage);
             }
             if (_hp <= 0f) { Die(); return; }
-            if (animator != null)   // every hit flinches (action/wushu hitstun)
+            if (attackTelegraph != null) attackTelegraph.Cancel();   // a hit interrupts the wind-up tell
+            if (animator != null)   // every hit flinches (action/wushu hitstun), reacting toward the hit
             {
+                int dir = HitReaction.Direction(transform.position, modelRoot.forward, modelRoot.right, sourcePos);
+                animator.SetInteger(AnimHitDir, dir);
                 animator.SetTrigger(AnimHit);
                 _staggerTimer = _data.hitReactTime;
                 _state = State.Seek;                      // a hit cancels a wind-up / lunge
@@ -285,6 +366,7 @@ namespace Hordebreakers
             _active = false;
             _dying = true;
             _deathTimer = _data != null ? _data.deathDuration : fallbackDeathDuration;
+            if (_data != null && _knockback.sqrMagnitude > 0.0001f) _knockback = _knockback.normalized * _data.deathKnockback;   // BIG knockback on death
             if (_collider != null) _collider.enabled = false;
             if (animator != null) animator.SetTrigger(AnimDead);
             if (GameManager.Instance != null)

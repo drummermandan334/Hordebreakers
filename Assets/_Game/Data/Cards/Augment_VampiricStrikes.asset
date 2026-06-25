@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: efd89a358890cf44c98ea44e2c471280, type: 3}
+  m_Name: Augment_VampiricStrikes
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.Augment
+  title: Vampiric Strikes
+  description: Melee hits heal you for 15% of the damage dealt.
+  rarity: 2
+  allowedClasses: -1
+  tags: 3
+  maxStacks: 0
+  effects:
+  - rid: 8406688341614395545
+  references:
+    version: 2
+    RefIds:
+    - rid: 8406688341614395545
+      type: {class: OnHitProcEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      data:
+        proc:
+          rid: 8406688341614395546
+    - rid: 8406688341614395546
+      type: {class: LifestealProc, ns: Hordebreakers, asm: Assembly-CSharp}
+      data:
+        fraction: 0.15

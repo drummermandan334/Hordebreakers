@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: efd89a358890cf44c98ea44e2c471280, type: 3}
+  m_Name: Augment_HeavyThrow
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.Augment
+  title: Heavy Throw
+  description: Thrown weapon damage +8.
+  rarity: 1
+  allowedClasses: -1
+  tags: 72
+  maxStacks: 0
+  effects:
+  - rid: 8406688341614395536
+  references:
+    version: 2
+    RefIds:
+    - rid: 8406688341614395536
+      type: {class: WeaponModEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      data:
+        target: 0
+        op: 0
+        amount: 8

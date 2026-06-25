@@ -7,9 +7,9 @@ namespace Hordebreakers
     /// Prototype player: camera-relative movement, jump, dodge (i-frames), and an INTERCHANGEABLE melee
     /// combo — every hit reads Light or Heavy, so 3 inputs make routes like L-L-L, L-H-L, L-L-H, H-H-H.
     /// The AnimatorController owns the combo tree (slots 1/2/3, each with a Light and Heavy state) and is
-    /// driven by the Light/Heavy triggers; this script tracks the step, drives forward feel, lands hits,
-    /// and DETONATES Marks on the heavy finisher (the core mark->detonate loop). Blade orientation comes
-    /// from the Synty Prop_R bone (no code blade tricks). Timer-driven, no per-frame alloc.
+    /// driven by the Light/Heavy triggers; this script tracks the step, drives forward feel, and lands hits
+    /// (the heavy finisher is a lunging strike). Blade orientation comes from the Synty Prop_R bone (no code
+    /// blade tricks). Timer-driven, no per-frame alloc.
     /// KBM: WASD move, LMB light, RMB heavy, Space jump, LeftShift dodge. (Throw = ThrowWeapon component.)
     /// Gamepad: left stick move, X light, Y/RT heavy, A jump, B dodge.
     /// </summary>
@@ -18,19 +18,35 @@ namespace Hordebreakers
     {
         [Header("Data")]
         [SerializeField] private PlayerCombatData data;
+        [Tooltip("Which class this character is — gates which augments the level-up draft can roll.")]
+        [SerializeField] private CharacterClass characterClass = CharacterClass.BattleSorcerer;
 
         [Header("Targeting / FX")]
         [SerializeField] private LayerMask enemyMask;
-        [SerializeField] private GameObject detonationVfxPrefab;   // optional one-shot
         [SerializeField] private Transform modelRoot;              // visual to rotate (defaults to self)
         [SerializeField] private Animator animator;               // locomotion + attack anims (defaults to child)
         [SerializeField] private HitFlash hitFlash;               // player flash on taking damage (defaults to child)
         [Tooltip("Front-arc gate for melee: enemies whose direction·facing is below this are ignored.")]
         [SerializeField] private float meleeArcDot = 0.35f;
+
+        [Header("Aim assist (subtle, rotation-only; 0 = fully manual)")]
+        [Range(0f, 1f)]
+        [Tooltip("Per-swing nudge toward the nearest enemy in the aim cone so attacks connect in a crowd. 0 = no assist (fully manual). Rotation only — never a pull, lock-on, or snap. Default low; tune by feel.")]
+        [SerializeField] private float aimAssistStrength = 0.25f;
+        [Tooltip("Half-angle (degrees) of the narrow front cone the assist will turn toward. Enemies outside it are ignored.")]
+        [SerializeField] private float aimAssistConeDeg = 25f;
+        [Tooltip("Max distance the aim assist looks for a target.")]
+        [SerializeField] private float aimAssistRange = 4f;
         [Tooltip("Melee hitbox center is placed this fraction of reach in front of the player.")]
         [SerializeField] private float meleeHitboxCenterFactor = 0.5f;
         [Tooltip("Melee hitbox radius as a fraction of reach.")]
         [SerializeField] private float meleeHitboxRadiusFactor = 0.45f;
+        [Range(0f, 1f)]
+        [Tooltip("Fraction of a LIGHT swing clip at which the hit lands — resolved AFTER the forward lunge, so the hitbox is where the blade visibly is (not where you stood when you pressed).")]
+        [SerializeField] private float meleeContactPhase = 0.35f;
+        [Range(0f, 1f)]
+        [Tooltip("Contact phase for HEAVY swings — later, to match the heavier wind-up. KEEP IN SYNC with WeaponVfx.heavyStrikeFraction so the hit and the slash VFX land together.")]
+        [SerializeField] private float heavyMeleeContactPhase = 0.5f;
 
         // Attack VFX (slash / stab swipe) is handled by the WeaponVfx component on this object.
 
@@ -52,45 +68,47 @@ namespace Hordebreakers
         [SerializeField] private float gravity = 20f;
         [Range(0f, 1f)][SerializeField] private float airControl = 0.7f;  // move authority while airborne
 
-        [Header("Detonation (heavy finisher pops Marks)")]
-        [Tooltip("Delay from the heavy-finisher press to the AoE detonation (lines up with the strike).")]
-        [SerializeField] private float detonateDelay = 0.14f;
-        [Tooltip("Detonation center is placed this fraction of heavyReach in front of the player.")]
-        [SerializeField] private float detonateForwardFactor = 0.6f;
-        [Tooltip("Seconds the spawned detonation VFX instance lives before being destroyed.")]
-        [SerializeField] private float detonateVfxLifetime = 2f;
-
         [Header("Juice — shake (x=amplitude, y=seconds) + hit-stop (x=seconds, y=timeScale)")]
         [SerializeField] private Vector2 hitShake = new Vector2(0.07f, 0.08f);
         [SerializeField] private Vector2 hitStop = new Vector2(0.03f, 0.3f);
         [SerializeField] private Vector2 finisherShake = new Vector2(0.16f, 0.14f);
         [SerializeField] private Vector2 finisherHitStop = new Vector2(0.07f, 0.12f);
-        [Tooltip("Detonation shake: x = base amplitude (grows per mark), y = seconds.")]
-        [SerializeField] private Vector2 detonateShake = new Vector2(0.12f, 0.25f);
-        [SerializeField] private float detonateShakePerStack = 0.03f;
-        [SerializeField] private float detonateHitStop = 0.08f;
         [SerializeField] private Vector2 damageShake = new Vector2(0.18f, 0.18f);
         [SerializeField] private Vector2 damageHitStop = new Vector2(0.05f, 0.25f);
+        [Tooltip("Min seconds between player hit-react flinches, so a dense horde can't stunlock the flinch animation.")]
+        [SerializeField] private float hitReactCooldown = 0.5f;
 
         [Tooltip("DEBUG: player takes no damage (for feel-testing). Turn OFF for real runs.")]
         [SerializeField] private bool invincible = false;
 
         private CharacterController _cc;
         private Transform _camT;
+        private ThrowWeapon _throw;
+        private PlayerLoadout _loadout;
         private float _hp;
-        private AutoWeapon _autoWeapon;
+        private float _stamina;
+        private float _staminaRegenDelayTimer;   // > 0 while regen is held off after a spend
+        private bool _dodgeStumble;              // the current dodge was a too-tired 'stumble' (weaker)
+        private bool _blocking;
+        private float _musou;
+        private bool _musouActive;
+        private float _musouTimer;
+        private bool _hasBlockParam, _hasMusouParam;   // does the Animator define these (else skip to avoid warnings)
 
         // timers / state
         private float _dodgeTimer;         // > 0 while dashing
         private float _dodgeCdTimer;
+        private float _hitReactCdTimer;    // > 0 while the player hit-react flinch is on cooldown
         private bool _invulnerable;
         private Vector3 _dodgeDir;
-        private float _detonateTimer;      // counts down to the heavy-finisher detonation
-        private bool _detonatePending;
         private int _comboStep;            // 1..3 combo slot (advances while chaining, resets in locomotion)
         private int _bufferedAttack;       // 0 none / 1 light / 2 heavy — press queued mid-swing
         private Vector3 _attackVel;        // brief forward drive on a swing
         private float _attackStepTimer;    // > 0 while the forward step is applied
+        private float _pendingReach, _pendingDamage;   // the armed swing's hit, resolved at its contact phase
+        private bool _pendingHeavy, _pendingFinisher;
+        private bool _swingHitResolved;    // true once the current swing has landed its hit (one hit per swing)
+        private int _lastAttackStateHash;  // fullPathHash of the swing's attack state — arms one hit per swing (input-independent)
         private float _verticalVel;
         private bool _grounded;
         private int _gripLayer = -1;       // "RightHandGrip" override layer; held off during attacks
@@ -104,11 +122,20 @@ namespace Hordebreakers
         private static readonly int AnimDodge = Animator.StringToHash("Dodge");
         private static readonly int AnimJump = Animator.StringToHash("Jump");
         private static readonly int AnimGrounded = Animator.StringToHash("Grounded");
+        private static readonly int AnimHit = Animator.StringToHash("Hit");
+        private static readonly int AnimHitDir = Animator.StringToHash("HitDir");
+        private static readonly int AnimBlock = Animator.StringToHash("Block");
+        private static readonly int AnimMusou = Animator.StringToHash("Musou");
 
         public bool IsAlive => _hp > 0f;
         public float HealthNormalized => data != null ? Mathf.Clamp01(_hp / data.maxHp) : 0f;
+        public float StaminaNormalized => data != null && data.maxStamina > 0f ? Mathf.Clamp01(_stamina / data.maxStamina) : 0f;
+        public float MusouNormalized => data != null && data.maxMusou > 0f ? Mathf.Clamp01(_musou / data.maxMusou) : 0f;
+        public bool MusouReady => data != null && _musou >= data.maxMusou;
         /// <summary>Facing the player rotates toward — used by the throw weapon to aim.</summary>
         public Transform ModelRoot => modelRoot;
+        /// <summary>The player's run-scoped build (taken augments, weapons, abilities). Wrapped by the augment context.</summary>
+        public PlayerLoadout Loadout => _loadout;
 
         private void Awake()
         {
@@ -116,7 +143,8 @@ namespace Hordebreakers
             if (modelRoot == null) modelRoot = transform;
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (hitFlash == null) hitFlash = GetComponentInChildren<HitFlash>();
-            if (animator != null) { _gripLayer = animator.GetLayerIndex("RightHandGrip"); _armLayer = animator.GetLayerIndex("SwordArm"); }
+            _throw = GetComponentInChildren<ThrowWeapon>();
+            if (animator != null) { _gripLayer = animator.GetLayerIndex("RightHandGrip"); _armLayer = animator.GetLayerIndex("SwordArm"); _hasBlockParam = HasParam("Block"); _hasMusouParam = HasParam("Musou"); }
             if (data == null)
             {
                 Debug.LogError("[PlayerController] Assign a PlayerCombatData asset.", this);
@@ -124,32 +152,26 @@ namespace Hordebreakers
                 return;
             }
             data = Instantiate(data);                 // runtime copy so upgrades don't dirty the source asset
-            _autoWeapon = GetComponent<AutoWeapon>();
             _camT = UnityEngine.Camera.main != null ? UnityEngine.Camera.main.transform : null;
             _hp = data.maxHp;
+            _stamina = data.maxStamina;
+            _loadout = new PlayerLoadout(characterClass, _throw);   // run-scoped build model
         }
 
-        /// <summary>Apply a level-up upgrade to the runtime data (clones, so the source asset is untouched).</summary>
-        public void ApplyUpgrade(UpgradeCard c)
+        /// <summary>Apply a level-up augment: runs every effect against the runtime stats + build loadout, then records it.</summary>
+        public void ApplyAugment(Augment augment)
         {
-            if (c == null) return;
-            switch (c.type)
-            {
-                case UpgradeType.MoveSpeed: data.moveSpeed += c.magnitude; break;
-                case UpgradeType.MaxHealth: data.maxHp += c.magnitude; _hp += c.magnitude; break;
-                case UpgradeType.DetonationRadius: data.detonationRadius += c.magnitude; break;
-                case UpgradeType.DetonationPower: data.detonationDamagePerStack += c.magnitude; break;
-                case UpgradeType.AutoDamage:
-                    if (_autoWeapon != null && _autoWeapon.RuntimeData != null) _autoWeapon.RuntimeData.damage += c.magnitude;
-                    break;
-                case UpgradeType.AutoFireRate:
-                    if (_autoWeapon != null && _autoWeapon.RuntimeData != null)
-                        _autoWeapon.RuntimeData.fireInterval = Mathf.Max(0.05f, _autoWeapon.RuntimeData.fireInterval - c.magnitude);
-                    break;
-                case UpgradeType.ExtraMark:
-                    if (_autoWeapon != null && _autoWeapon.RuntimeData != null) _autoWeapon.RuntimeData.marksPerHit += Mathf.RoundToInt(c.magnitude);
-                    break;
-            }
+            if (augment == null || _loadout == null) return;
+            AugmentContext ctx = new AugmentContext(this, data, _loadout);
+            augment.Apply(in ctx);
+            _loadout.Record(augment);
+        }
+
+        /// <summary>Restore health, capped at current max. Used by level-up upgrade effects.</summary>
+        public void Heal(float amount)
+        {
+            if (amount <= 0f) return;
+            _hp = Mathf.Min(_hp + amount, data.maxHp);
         }
 
         private void Update()
@@ -158,15 +180,17 @@ namespace Hordebreakers
             TickTimers(dt);
             UpdateGripLayer(dt);
 
+            // Musou finisher owns the player completely (rooted, i-frames) while active.
+            if (_musouActive) { TickMusou(dt); return; }
+
             // Dodge takes over completely while active.
             if (_dodgeTimer > 0f)
             {
                 SetAnimSpeed(0f, dt);
-                MoveWithVertical(_dodgeDir * data.dodgeSpeed, dt);
+                float dodgeSpeed = data.dodgeSpeed * (_dodgeStumble ? data.stumbleDodgeSpeedMult : 1f);
+                MoveWithVertical(_dodgeDir * dodgeSpeed, dt);
                 return;
             }
-
-            ResolveDetonate(dt);
 
             _grounded = _cc.isGrounded;
             if (animator != null) animator.SetBool(AnimGrounded, _grounded);
@@ -177,16 +201,45 @@ namespace Hordebreakers
             // Chain only once the current swing has played comboChainOpen of its clip, so each swing animates fully.
             bool canAct = !inAttack || (_grounded && AttackPhase() >= data.comboChainOpen);
 
-            if (_bufferedAttack != 0 && canAct) { int b = _bufferedAttack; _bufferedAttack = 0; AttackInput(b == 2); }
-            HandleActionInput(moveDir, canAct, inAttack);   // jump/dodge act immediately; attacks chain or buffer
+            bool firedBuffered = false;
+            if (_bufferedAttack != 0 && canAct) { int b = _bufferedAttack; _bufferedAttack = 0; AttackInput(b == 2); firedBuffered = true; }
+            // If a buffered attack already fired this frame, a fresh press BUFFERS for the next chain instead of also
+            // firing now — otherwise buffer + same-frame press double-fires (two combo advances + two whooshes).
+            HandleActionInput(moveDir, canAct && !firedBuffered, inAttack);   // jump/dodge act immediately; attacks chain or buffer
+
+            // Musou: full meter + grounded + not mid-swing → unleash the screen-clear finisher (it owns the next frames).
+            if (TryMusou(inAttack)) return;
+
+            // Block is a grounded defensive stance: held, and not while attacking.
+            _blocking = ReadBlockHeld() && _grounded && !inAttack;
+
+            // Arm exactly one hit per swing the instant a NEW attack state begins (its fullPathHash changes). This ties
+            // the hit to the actual swing animation — without it, chaining re-armed the hit while the animator was still
+            // in the PREVIOUS swing at a late phase, so it resolved instantly on the button press with the hitbox in the
+            // wrong place (the early/inconsistent hits). Mirrors WeaponVfx's per-swing detection.
+            int atkHash = CurrentAttackStateHash();
+            if (atkHash != _lastAttackStateHash) { _lastAttackStateHash = atkHash; if (atkHash != 0) _swingHitResolved = false; }
 
             if (inAttack)
             {
+                // Land the swing's hit once it reaches its contact phase (after the lunge has carried us in).
+                // Heavies land later so the impact stays synced with the heavier swing's slash VFX.
+                float contactPhase = _pendingHeavy ? heavyMeleeContactPhase : meleeContactPhase;
+                if (!_swingHitResolved && AttackPhase() >= contactPhase) ResolveSwingHit();
+
                 // Committed to a swing: the attack's forward lunge drives movement and OVERRIDES move input;
                 // the player only gets a slight steer (no free gliding mid-attack).
                 Vector3 momentum = _attackStepTimer > 0f ? _attackVel : Vector3.zero;
                 MoveWithVertical(momentum + moveDir * data.attackSteerSpeed, dt);
                 SetAnimSpeed(0f, dt);
+            }
+            else if (_blocking)
+            {
+                _comboStep = 0;
+                float bctrl = data.blockMoveSpeedMult;                             // blocking slows you — not a free turtle
+                MoveWithVertical(moveDir * data.moveSpeed * bctrl, dt);
+                if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
+                SetAnimSpeed(moveDir.magnitude * bctrl, dt);
             }
             else
             {
@@ -196,14 +249,99 @@ namespace Hordebreakers
                 if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
                 SetAnimSpeed(moveDir.magnitude, dt);
             }
+
+            if (_hasBlockParam) animator.SetBool(AnimBlock, _blocking);
         }
 
         private void TickTimers(float dt)
         {
             if (_attackStepTimer > 0f) _attackStepTimer -= dt;
             if (_dodgeCdTimer > 0f) _dodgeCdTimer -= dt;
+            if (_hitReactCdTimer > 0f) _hitReactCdTimer -= dt;
             if (_dodgeTimer > 0f) _dodgeTimer -= dt;
-            _invulnerable = _dodgeTimer > 0f && _dodgeTimer > (data.dodgeDuration - data.dodgeIFrames);
+            float iFrames = data.dodgeIFrames * (_dodgeStumble ? data.stumbleDodgeIFrameMult : 1f);
+            _invulnerable = _dodgeTimer > 0f && _dodgeTimer > (data.dodgeDuration - iFrames);
+
+            // Stamina regen: kicks in after a short delay once you stop spending (movement never costs stamina).
+            if (_staminaRegenDelayTimer > 0f) _staminaRegenDelayTimer -= dt;
+            else if (_stamina < data.maxStamina) _stamina = Mathf.Min(data.maxStamina, _stamina + data.staminaRegen * dt);
+        }
+
+        /// <summary>Spend stamina if affordable; returns false (no spend) when too tired. Resets the regen delay on a spend.</summary>
+        private bool SpendStamina(float cost)
+        {
+            if (_stamina < cost) return false;
+            _stamina -= cost;
+            _staminaRegenDelayTimer = data.staminaRegenDelay;
+            return true;
+        }
+
+        private bool HasParam(string name)
+        {
+            for (int i = 0; i < animator.parameters.Length; i++)
+            {
+                if (animator.parameters[i].name == name) return true;
+            }
+            return false;
+        }
+
+        // ---------- Block ----------
+        private bool ReadBlockHeld()
+        {
+            Gamepad pad = Gamepad.current;
+            return Input.GetKey(KeyCode.F) || (pad != null && pad.leftTrigger.ReadValue() > 0.5f);
+        }
+
+        /// <summary>True if the hit came from within the frontal block cone (you can't block your back).</summary>
+        private bool IsFrontalHit(Vector3 sourcePos)
+        {
+            Vector3 toSource = sourcePos - transform.position; toSource.y = 0f;
+            if (toSource.sqrMagnitude < 0.0001f) return true;
+            return Vector3.Dot(toSource.normalized, modelRoot.forward) >= data.blockFrontDot;
+        }
+
+        // ---------- Musou ----------
+        private bool TryMusou(bool inAttack)
+        {
+            Gamepad pad = Gamepad.current;
+            bool pressed = Input.GetKeyDown(KeyCode.R) || (pad != null && pad.rightStickButton.wasPressedThisFrame);
+            if (!pressed || inAttack || !_grounded || _musou < data.maxMusou) return false;
+            StartMusou();
+            return true;
+        }
+
+        private void StartMusou()
+        {
+            _musouActive = true;
+            _musouTimer = data.musouDuration;
+            _musou = 0f;
+            _attackStepTimer = 0f; _attackVel = Vector3.zero;
+            _bufferedAttack = 0;
+            if (_hasMusouParam && animator != null) animator.SetTrigger(AnimMusou);
+
+            // Screen-clear pulse: damage everything in radius; the player position is the source so enemies recoil outward.
+            Vector3 origin = transform.position;
+            int n = Physics.OverlapSphereNonAlloc(origin, data.musouRadius, _hits, enemyMask);
+            for (int i = 0; i < n; i++)
+            {
+                if (_hits[i].TryGetComponent(out IDamageable d) && d.IsAlive) d.TakeDamage(data.musouDamage, origin);
+            }
+            PlayerCameraRig.Shake(finisherShake.x * 2f, finisherShake.y * 1.5f);
+            if (GameManager.Instance != null) GameManager.Instance.HitStop(finisherHitStop.x, finisherHitStop.y);
+        }
+
+        private void TickMusou(float dt)
+        {
+            SetAnimSpeed(0f, dt);
+            MoveWithVertical(Vector3.zero, dt);   // rooted + committed; gravity still resolves
+            _musouTimer -= dt;
+            if (_musouTimer <= 0f) _musouActive = false;
+        }
+
+        private void GainMusou(float amount)
+        {
+            if (amount <= 0f || _musouActive) return;
+            _musou = Mathf.Min(data.maxMusou, _musou + amount);
         }
 
         private Vector3 ReadMoveDir()
@@ -277,11 +415,18 @@ namespace Hordebreakers
         private void UpdateGripLayer(float dt)
         {
             if (animator == null) return;
-            bool attacking = IsBaseInAttack();
+            bool suppress = IsBaseInAttack() || IsBaseInHitReact();   // let full-body attack/flinch clips own the arm
             if (_gripLayer >= 0)
-                animator.SetLayerWeight(_gripLayer, attacking ? 0f : Mathf.MoveTowards(animator.GetLayerWeight(_gripLayer), 1f, gripBlendSpeed * dt));
+                animator.SetLayerWeight(_gripLayer, suppress ? 0f : Mathf.MoveTowards(animator.GetLayerWeight(_gripLayer), 1f, gripBlendSpeed * dt));
             if (_armLayer >= 0)
-                animator.SetLayerWeight(_armLayer, attacking ? 0f : Mathf.MoveTowards(animator.GetLayerWeight(_armLayer), armLayerWeight, gripBlendSpeed * dt));
+                animator.SetLayerWeight(_armLayer, suppress ? 0f : Mathf.MoveTowards(animator.GetLayerWeight(_armLayer), armLayerWeight, gripBlendSpeed * dt));
+        }
+
+        /// <summary>True while the base layer is in (or transitioning into) a directional hit-react state.</summary>
+        private bool IsBaseInHitReact()
+        {
+            if (animator.GetCurrentAnimatorStateInfo(0).IsTag("HitReact")) return true;
+            return animator.IsInTransition(0) && animator.GetNextAnimatorStateInfo(0).IsTag("HitReact");
         }
 
         /// <summary>True while the base layer is in (or transitioning into) a state tagged "Attack".</summary>
@@ -313,6 +458,19 @@ namespace Hordebreakers
             return cur.IsTag("Attack") ? Mathf.Repeat(cur.normalizedTime, 1f) : 1f;
         }
 
+        /// <summary>fullPathHash of the current (or transitioning-into) attack state; 0 when not attacking. Used to arm one hit per swing.</summary>
+        private int CurrentAttackStateHash()
+        {
+            if (animator == null) return 0;
+            if (animator.IsInTransition(0))
+            {
+                var nxt = animator.GetNextAnimatorStateInfo(0);
+                return nxt.IsTag("Attack") ? nxt.fullPathHash : 0;
+            }
+            var cur = animator.GetCurrentAnimatorStateInfo(0);
+            return cur.IsTag("Attack") ? cur.fullPathHash : 0;
+        }
+
         private void StepForward(float speed)
         {
             _attackVel = modelRoot.forward * speed;
@@ -323,6 +481,9 @@ namespace Hordebreakers
         private void StartDodge(Vector3 moveDir)
         {
             _attackStepTimer = 0f; _attackVel = Vector3.zero;
+            // Empty != defenseless: too tired to pay full cost still gets a weaker 'stumble' dodge, never a lockout.
+            _dodgeStumble = !SpendStamina(data.dodgeStaminaCost);
+            if (_dodgeStumble) _staminaRegenDelayTimer = data.staminaRegenDelay;
             _dodgeDir = moveDir.sqrMagnitude > 0.01f ? moveDir.normalized : modelRoot.forward;
             _dodgeTimer = data.dodgeDuration;
             _dodgeCdTimer = data.dodgeCooldown;
@@ -332,49 +493,44 @@ namespace Hordebreakers
 
         // ---------- Interchangeable combo ----------
         // Each press advances one slot (1->2->3) within the combo window, firing the Light or Heavy
-        // trigger; the AnimatorController routes slot+input to the right clip. The heavy 3rd hit detonates.
+        // trigger; the AnimatorController routes slot+input to the right clip. The 3rd hit is the lunge.
         private void AttackInput(bool heavy)
         {
+            float cost = heavy ? data.heavyStaminaCost : data.lightStaminaCost;
+            if (!SpendStamina(cost)) return;   // too tired to swing — movement is free, so reposition while stamina regens
+
+            CombatAudio.PlaySwing(transform.position);   // swing whoosh (clips live on CombatAudio)
             _comboStep = (InComboAttack() && _comboStep < 3) ? _comboStep + 1 : 1;   // chaining advances the slot; a fresh attack resets it
-            SoftTargetFace();
+            AimFace();
             if (animator != null) animator.SetTrigger(heavy ? AnimHeavy : AnimLight);
 
             bool finisher = _comboStep >= 3;
             StepForward(finisher ? lungeStep : attackStep);
 
-            float reach = heavy ? data.heavyReach : data.lightReach;
-            float dmg = heavy ? data.heavyDamage : data.lightDamage;
-            int hits = MeleeHit(reach, dmg);
-
-            if (heavy && finisher) { _detonatePending = true; _detonateTimer = detonateDelay; }   // pop Marks
-            if (hits > 0 || (heavy && finisher)) HitJuice(finisher || heavy);
+            // Stage this swing's hit params; the hit is ARMED + resolved in Update off the animator state change
+            // (CurrentAttackStateHash), so it lands at this swing's real contact phase — never on the press frame.
+            _pendingHeavy = heavy;
+            _pendingFinisher = finisher;
+            _pendingReach = heavy ? data.heavyReach : data.lightReach;
+            _pendingDamage = heavy ? data.heavyDamage : data.lightDamage;
         }
 
-        private void ResolveDetonate(float dt)
+        /// <summary>Applies the armed swing's melee hit once, at its contact phase.</summary>
+        private void ResolveSwingHit()
         {
-            if (!_detonatePending) return;
-            _detonateTimer -= dt;
-            if (_detonateTimer > 0f) return;
-
-            _detonatePending = false;
-            Vector3 center = transform.position + modelRoot.forward * (data.heavyReach * detonateForwardFactor) + Vector3.up;
-            int stacks = Detonate(center, data.detonationRadius);    // consume + burst marks
-            if (detonationVfxPrefab != null) Destroy(Instantiate(detonationVfxPrefab, center, Quaternion.identity), detonateVfxLifetime);
-
-            // Juice scales with the payoff: bigger detonation -> bigger shake, brief hit-stop on a real pop.
-            if (ThirdPersonCamera.Instance != null)
-                ThirdPersonCamera.Instance.Shake(detonateShake.x + Mathf.Min(stacks, 20) * detonateShakePerStack, detonateShake.y);
-            if (stacks > 0 && GameManager.Instance != null)
-                GameManager.Instance.HitStop(detonateHitStop);
+            _swingHitResolved = true;
+            int hits = MeleeHit(_pendingReach, _pendingDamage);
+            if (hits > 0 || (_pendingHeavy && _pendingFinisher)) HitJuice(_pendingFinisher);
         }
 
         // ---------- FX / feedback ----------
-        /// <summary>Impact feedback (weight): camera shake + brief hit-stop, stronger on the finisher.</summary>
+        /// <summary>Impact feedback on EVERY connect: camera shake + hit-stop (a small "connect" stop on lights, a big
+        /// weighty one on the finisher). Tune hitStop / finisherHitStop to taste — set hitStop to (0, 1) for no light stop.</summary>
         private void HitJuice(bool finisher)
         {
             Vector2 shake = finisher ? finisherShake : hitShake;
             Vector2 stop = finisher ? finisherHitStop : hitStop;
-            if (ThirdPersonCamera.Instance != null) ThirdPersonCamera.Instance.Shake(shake.x, shake.y);
+            PlayerCameraRig.Shake(shake.x, shake.y);
             if (GameManager.Instance != null) GameManager.Instance.HitStop(stop.x, stop.y);
         }
 
@@ -391,56 +547,92 @@ namespace Hordebreakers
                 Collider col = _hits[i];
                 Vector3 to = col.transform.position - origin; to.y = 0f;
                 if (to.sqrMagnitude > 0.0001f && Vector3.Dot(to.normalized, fwd) < meleeArcDot) continue;  // front arc only
-                if (col.TryGetComponent(out IDamageable d) && d.IsAlive) { d.TakeDamage(damage); hits++; }
+                if (col.TryGetComponent(out IDamageable d) && d.IsAlive)
+                {
+                    d.TakeDamage(damage, origin);
+                    hits++;
+                    GainMusou(damage * data.musouGainDealtPerDamage);
+                    if (_loadout != null)
+                    {
+                        _loadout.DispatchOnHit(new OnHitContext(this, d, col.transform.position, damage, _pendingHeavy, _pendingFinisher));
+                    }
+                }
             }
             return hits;
         }
 
-        private int Detonate(Vector3 center, float radius)
+        /// <summary>
+        /// Facing on a swing: face the player's aim (the camera-relative movement direction), then apply a
+        /// SUBTLE, rotation-only assist that nudges a few degrees toward the nearest enemy in a narrow front
+        /// cone so swings connect in a crowd. Never a positional pull, lock-on, or snap; aimAssistStrength 0 =
+        /// fully manual. When there's no movement input, the current facing is kept (then nudged).
+        /// </summary>
+        private void AimFace()
         {
-            int total = 0;
-            int n = Physics.OverlapSphereNonAlloc(center, radius, _hits, enemyMask);
-            for (int i = 0; i < n; i++)
-            {
-                Collider col = _hits[i];
-                int stacks = col.TryGetComponent(out Markable m) ? m.ConsumeAll() : 0;
-                total += stacks;
-                if (col.TryGetComponent(out IDamageable d) && d.IsAlive)
-                    d.TakeDamage(data.detonationFlatDamage + stacks * data.detonationDamagePerStack);
-            }
-            return total;
+            Vector3 dir = ReadMoveDir();
+            if (dir.sqrMagnitude > 0.01f) modelRoot.rotation = Quaternion.LookRotation(dir.normalized);
+
+            if (aimAssistStrength <= 0f) return;
+            Transform target = NearestEnemyInCone(aimAssistConeDeg, aimAssistRange);
+            if (target == null) return;
+            Vector3 to = target.position - transform.position; to.y = 0f;
+            if (to.sqrMagnitude < 0.0001f) return;
+            Quaternion want = Quaternion.LookRotation(to.normalized);
+            modelRoot.rotation = Quaternion.Slerp(modelRoot.rotation, want, aimAssistStrength);   // rotation-only nudge, scaled by strength
         }
 
-        private void SoftTargetFace()
+        /// <summary>Nearest enemy whose direction is within <paramref name="coneDeg"/> of the player's facing, inside range. Non-alloc.</summary>
+        private Transform NearestEnemyInCone(float coneDeg, float range)
         {
-            Transform t = FindNearest(data.softTargetRange);
-            if (t == null) return;
-            Vector3 dir = t.position - transform.position; dir.y = 0f;
-            if (dir.sqrMagnitude > 0.01f) modelRoot.rotation = Quaternion.LookRotation(dir);
-        }
-
-        private Transform FindNearest(float range)
-        {
-            int n = Physics.OverlapSphereNonAlloc(transform.position, range, _hits, enemyMask);
+            Vector3 origin = transform.position + Vector3.up;
+            Vector3 fwd = modelRoot.forward;
+            float cosCone = Mathf.Cos(coneDeg * Mathf.Deg2Rad);
+            int n = Physics.OverlapSphereNonAlloc(origin, range, _hits, enemyMask);
             Transform best = null;
             float bestSq = float.MaxValue;
             for (int i = 0; i < n; i++)
             {
-                float sq = (_hits[i].transform.position - transform.position).sqrMagnitude;
+                Vector3 to = _hits[i].transform.position - origin; to.y = 0f;
+                float sq = to.sqrMagnitude;
+                if (sq < 0.0001f) continue;
+                if (Vector3.Dot(to.normalized, fwd) < cosCone) continue;   // outside the narrow cone
                 if (sq < bestSq) { bestSq = sq; best = _hits[i].transform; }
             }
             return best;
         }
 
         // ---------- IDamageable ----------
-        public void TakeDamage(float amount)
+        public void TakeDamage(float amount) => TakeDamage(amount, transform.position + modelRoot.forward);
+
+        public void TakeDamage(float amount, Vector3 sourcePos)
         {
-            if (invincible || _invulnerable || _hp <= 0f) return;
+            if (invincible || _invulnerable || _musouActive || _hp <= 0f) return;   // dodge i-frames AND the musou finisher fully negate
+
+            // Block: a frontal hit is mitigated (chips through) at a stamina cost; mitigates partially even when empty.
+            bool blocked = false;
+            if (_blocking && IsFrontalHit(sourcePos))
+            {
+                float mit = _stamina >= data.blockStaminaPerHit ? data.blockMitigation : data.emptyBlockMitigation;
+                SpendStamina(data.blockStaminaPerHit);
+                amount *= (1f - mit);
+                blocked = true;
+            }
+
             _hp -= amount;
+            GainMusou(amount * data.musouGainTakenPerDamage);
             if (hitFlash != null) hitFlash.Flash();
-            if (ThirdPersonCamera.Instance != null) ThirdPersonCamera.Instance.Shake(damageShake.x, damageShake.y);
+            PlayerCameraRig.Shake(damageShake.x, damageShake.y);
             if (GameManager.Instance != null) GameManager.Instance.HitStop(damageHitStop.x, damageHitStop.y);
-            if (_hp <= 0f) Die();
+            if (_hp <= 0f) { Die(); return; }
+
+            // Flinch only when caught out — blocking absorbs the flinch; never mid-swing/dodge, off cooldown.
+            if (!blocked && animator != null && _hitReactCdTimer <= 0f && !IsBaseInAttack() && _dodgeTimer <= 0f)
+            {
+                int dir = HitReaction.Direction(transform.position, modelRoot.forward, modelRoot.right, sourcePos);
+                animator.SetInteger(AnimHitDir, dir);
+                animator.SetTrigger(AnimHit);
+                _hitReactCdTimer = hitReactCooldown;
+            }
         }
 
         private void Die()

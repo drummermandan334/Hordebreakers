@@ -7,7 +7,7 @@ namespace Hordebreakers
     /// <summary>
     /// Player-triggered thrown weapon (a Synty dagger). Reuses the pooled <see cref="Projectile"/>. Throws
     /// toward the player's facing, snapping to the nearest enemy inside a forward cone for a little aim
-    /// assist, gated by a cooldown. Applies a Mark + damage on hit (feeds the mark->detonate loop).
+    /// assist, gated by a cooldown. Deals damage on hit.
     /// KBM: Q.  Gamepad: Left Bumper.
     /// </summary>
     public class ThrowWeapon : MonoBehaviour
@@ -20,7 +20,6 @@ namespace Hordebreakers
 
         [Header("Tuning")]
         [SerializeField] private float damage = 14f;
-        [SerializeField] private int marks = 1;
         [SerializeField] private float speed = 22f;
         [SerializeField] private float lifetime = 2f;
         [SerializeField] private float cooldown = 0.55f;
@@ -36,6 +35,11 @@ namespace Hordebreakers
         private Action<Projectile> _return;
         private float _cd;
         private readonly Collider[] _hits = new Collider[64];
+
+        // ---------- Upgrade hooks (driven by ThrowWeaponBuffEffect) ----------
+        public float Damage { get => damage; set => damage = Mathf.Max(0f, value); }
+        public float ProjectileSpeed { get => speed; set => speed = Mathf.Max(0f, value); }
+        public float Cooldown { get => cooldown; set => cooldown = Mathf.Max(0.05f, value); }
 
         private void Awake()
         {
@@ -76,7 +80,7 @@ namespace Hordebreakers
 
             Projectile p = _pool.Get();
             p.transform.SetPositionAndRotation(origin, Quaternion.LookRotation(dir));
-            p.Init(dir, damage, marks, speed, lifetime, enemyMask, _return);
+            p.Init(dir, damage, speed, lifetime, enemyMask, _return);
         }
 
         private Transform FindForwardTarget(Vector3 origin, Vector3 fwd)

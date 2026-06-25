@@ -38,10 +38,13 @@ namespace Hordebreakers
         public int Wave { get; private set; }
         public int Kills { get; private set; }
         public bool LevelUpPending { get; private set; }
+        public int PendingLevelUps => _pendingLevelUps;
 
         public event Action OnStateChanged;     // HUD refresh
-        public event Action<int> OnLevelUp;      // arg = new level
+        public event Action<int> OnLevelUp;      // arg = new level (fires per level, for HUD feedback)
+        public event Action OnDraftRequested;    // fires at a breather when banked picks are ready to resolve
 
+        private int _pendingLevelUps;
         private float _hitStopTimer;
         private ObjectPool<XpGem> _gemPool;
         private Action<XpGem> _gemReturn;
@@ -113,18 +116,33 @@ namespace Hordebreakers
                 Xp -= XpToNext;
                 Level++;
                 XpToNext = Mathf.RoundToInt(XpToNext * xpToNextGrowth) + xpToNextFlatAdd;
-                // Cards disabled: level-ups bank silently mid-arena. The pick happens AFTER an arena is
-                // cleared (D&D-style) — wire that to the arena/wave-complete flow when it exists.
+                // Level-ups bank silently mid-arena; the augment pick resolves at the next breather
+                // (D&D-style, between encounters — see ResolvePendingAtBreather).
+                _pendingLevelUps++;
                 OnLevelUp?.Invoke(Level);
             }
             OnStateChanged?.Invoke();
         }
 
-        /// <summary>Called by the card UI once a level-up choice is resolved.</summary>
-        public void ClearLevelUpPending()
+        /// <summary>Called by the wave director when a wave/arena is cleared (the breather). If level-ups are
+        /// banked, pause the run and request the augment draft to resolve them.</summary>
+        public void ResolvePendingAtBreather()
         {
-            LevelUpPending = false;
-            Time.timeScale = 1f;
+            if (_pendingLevelUps <= 0) return;
+            LevelUpPending = true;
+            Time.timeScale = 0f;
+            OnDraftRequested?.Invoke();
+        }
+
+        /// <summary>Called by the draft UI after each pick. Restores time once the last banked pick is taken.</summary>
+        public void ConsumeOnePendingLevelUp()
+        {
+            if (_pendingLevelUps > 0) _pendingLevelUps--;
+            if (_pendingLevelUps == 0)
+            {
+                LevelUpPending = false;
+                Time.timeScale = 1f;
+            }
         }
 
         public void SetWave(int wave)

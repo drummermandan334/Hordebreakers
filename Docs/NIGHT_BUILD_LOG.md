@@ -114,3 +114,91 @@ Several rounds of feedback. All compiled clean; verified in play where possible 
 - Player **hit-react on taking damage** + **hitboxes matched to each hit reaction** (next task).
 - `invincible` debug flag still ON on the Arena01 player.
 - The AutoWeapon / Marks decision above; and combo/VFX/separation **feel** wants Daniel's eyes.
+
+---
+
+# Night 3 (2026-06-24, overnight) — VFX fix, VS-era teardown, hitboxes, camera, UI
+
+5-task batch with advance permission. Working order (by dependency/risk): VFX fix → cleanup → hitboxes → camera → UI.
+
+## Flags for the morning (read these)
+- **GDD CONFLICT:** removed the **mark → detonate** loop (the "heavy explosion") per your instruction. `HORDEBREAKERS_GDD.md` still calls mark→detonate the *core loop* — it needs a rewrite to the action/wushu direction. Flagging rather than silently diverging.
+- **Cinemachine** package added — the new camera task required it.
+- **Kept the thrown dagger** (ThrowWeapon, Q) as a ranged option; it fed Marks but works as plain damage. Say the word if you'd rather cut it.
+- Upgrade-card scaffolding (UpgradeCard/UI + the 2 generic cards) **kept** for the vertical slice; the 5 VS-specific cards (auto-weapon / detonation upgrades) removed.
+
+## Task status (your numbering)
+- [x] **1. VFX attach** — `FX_SwordStab_01` was World-sim, so the burst was left behind by the swing. `WeaponVfx.Spawn` now forces every spawned particle system to **Local**, so any effect rides the blade. Stab verified on the sword; the light-jump slash was already Local/attached (the big swipe just reads as floating mid-leap — `WeaponVfx.localPosition`/`scale` are tunable).
+- [x] **2. UI** — DONE. Replaced the code HUD with the **Synty Fantasy Warrior HUD** art.
+  - `HUDCanvas` now hosts: `HUD_FantasyWarrior_HealthBar_01` (top-left, heart icon + red fill), `_Parts/HUD_FantasyWarrior_XPBar_01`
+    (bottom-center, cyan fill + "x / next" label), and a `Label_FantasyWarrior_Header` (Grenze font) reading "Lv x  Wave y  Kills z".
+  - Both bars are Synty **Sliders** (driven by `Slider.value`); text is **TextMeshPro**. `HUDController` rewritten to drive
+    `healthSlider`/`xpSlider`/`xpText`/`infoText` (was Image-fill + legacy Text). Deps already in project (InterfaceCore, Grenze SDF font).
+  - Verified in play: dealt damage → health bar dropped; +kill/+xp → "Kills 1" and XP bar "2/5" cyan fill updated. Zero errors.
+  - Chose individual widgets over the pre-made `_PreMadeHUDs/Screen_FantasyWarrior_HUD_ARPG_01` (73 nested instances — overkill).
+  - Polish later if wanted: bar sizes/positions, font sizing, and the empty XP bar reads plain grey until XP accrues.
+
+## Morning feedback round (2026-06-24, with Daniel)
+- **Player wasn't hit-reacting** — root cause: the `invincible` debug flag was still **ON**, so `TakeDamage` returned
+  before the flinch (no damage, no react). Turned **invincible OFF** on the Arena01 player. Verified in play: a frontal
+  hit now drives `Locomotion → HitReactF`. (Enemies were reacting fine all along.)
+- **Camera lowered** — `PlayerCameraRig.defaultPitch` 20→13 and OrbitalFollow `VerticalAxis` 20→13 + `TargetOffset.y` 1.4→1.1.
+- **Camera shake OFF** — added `PlayerCameraRig.enableShake` toggle (set false on the scene rig) so hit-reactions read clearly.
+- **STILL OPEN (Daniel: "problem for later today"):** melee **hitboxes + reaction times need tuning**; **auto-targeting
+  (`SoftTargetFace`) feels terrible** — wants manual/aim-based targeting instead.
+
+### Combat-feel round 2 (2026-06-24) — after camera/reactions confirmed good
+- **Targeting → MANUAL.** Removed `SoftTargetFace`/`FindNearest` + `PlayerCombatData.softTargetRange`. On a swing the
+  player now faces `AimFace()` = the camera-relative movement direction (where you're pushing); no auto-snap to nearest,
+  keeps current facing when there's no input. Hit arc follows facing, so you hit where you aim.
+- **Melee hitbox now resolves at the swing's CONTACT phase, not on the press frame.** Was: `MeleeHit` ran in `AttackInput`
+  *before* the forward lunge moved the player → lunging swings could whiff / damage didn't match the visible blade. Now the
+  swing is "armed" on press and resolves once in `Update` at `meleeContactPhase` (0.35, Inspector) — after the lunge carries
+  you in. One hit per swing (`_swingHitResolved`). Reach/arc/radius left as-is (didn't blind-tune; judge now that timing's fixed).
+- **Reaction times NOT touched yet** — subjective, want Daniel's direction (enemy `hitReactTime` 0.3 / player `hitReactCooldown` 0.5).
+
+### Combat backlog — NOTED, not yet done (Daniel, 2026-06-24)
+1. **Player hits should knock the enemy back.** Add/strengthen knockback on the enemy when the player lands a hit (impact
+   feel). Note: `Enemy.TakeDamage` already sets `_knockback` from the hit source via `EnemyData.knockback` — likely just
+   too weak/unnoticeable, so bump it and/or make it read better (it currently decays via `knockbackDecayRate`).
+2. **Improve the enemy attack — it closes too far before striking, and the strike needs forward movement.** The enemy should
+   commit to its attack from FURTHER out and lunge INTO the player (a committed forward dash), instead of walking right up
+   then doing a short poke. Levers in `Enemy.cs` / `EnemyData`: raise the attack-initiation distance (standoff ring /
+   `lungeConnectReachMult`), and give the lunge more travel (`lungeSpeed` × `lungeTime`) so the strike carries forward.
+
+### Next-up / process
+- After the **UI/HUD** task, Daniel will **equip new plugins** to speed development along (TBD which) — expect a tooling change.
+- [x] **3. Hitboxes** — DONE. Directional front/back/left/right hit-reactions for enemies + player.
+  - Clips: `A_Hit_{F,B,L,R}_React_Sword` (SwordCombat pack). Added `HitReact{F,B,L,R}` states + `Hit`(trigger)/`HitDir`(int)
+    params to all 3 controllers (`Husk`/`Brute`/`Player`) via editor scripting; `AnyState → HitReact{dir}` on `Hit && HitDir==n`,
+    exit→Locomotion (exitTime 0.7). React states tagged `HitReact`.
+  - `IDamageable` gained `TakeDamage(amount, Vector3 sourcePos)`; the old 1-arg version defaults to a frontal hit.
+    All call sites pass the source: melee → player pos, projectile → its pos, enemy lunge / brute slam → their pos.
+  - `HitReaction.Direction(...)` (new, `Combat/`) classifies F/B/L/R from the source relative to the victim's facing.
+  - Enemies: every hit now reacts toward the hit; knockback recoils away from the **source** (was always away from the player).
+    Brute keeps poise mid-slam. Player: flinch is **gated** — only when not mid-attack/dodge, on a `hitReactCooldown` (0.5s,
+    Inspector) so a dense horde can't stunlock it; no movement lock. Grip/arm override layers blend off during the flinch
+    (new `IsBaseInHitReact`) so the full-body react owns the arm.
+  - **FEEL TO CHECK:** player flinch frequency/length, and whether B/L/R reads right vs. the camera. All knobs Inspector-exposed.
+- [x] **4. Cleanup** — DONE. Detonation/Marks already stripped from Projectile/ThrowWeapon + PlayerController.ApplyUpgrade.
+  Finished the teardown the morning after (comp restart had left it half-done with a compile error):
+  - Deleted scripts: `AutoWeapon.cs`, `WeaponData.cs`, `Markable.cs`.
+  - Removed their components: `AutoWeapon` off `Player.prefab` (was a missing-script ref), `Markable` off `Brute`/`Husk` prefabs.
+  - Deleted assets: `ThrowingKnives.asset` (WeaponData instance) + the 5 VS cards (`Card_AutoDamage/FireRate/ExtraMark/DetRadius/DetPower`).
+  - Trimmed `UpgradeType` enum to `{MoveSpeed, MaxHealth}`; repointed the 2 kept cards' `type` (5→0, 6→1) and trimmed the
+    `LevelUpUI` (inactive) `UpgradeCardUI.pool` from 7→2 cards. Compiles clean, zero console errors/warnings.
+  - NOTE: `Assets/_Recovery/*.unity` backups still hold dangling GUID refs to the deleted cards — they're unloaded backups, harmless.
+- [x] **5. Camera** — DONE (you chose "convert to Cinemachine"). Installed **Cinemachine 3.1.7**.
+  - Main Camera now has a `CinemachineBrain`; new `CM_PlayerCam` = `CinemachineCamera` + `CinemachineOrbitalFollow`
+    (Sphere, **WorldSpace** binding, radius 8, target offset y1.4, pos-damping 0.3) + `CinemachineRotationComposer`
+    (aim offset y1.3) + `CinemachineDeoccluder` (wall avoidance) + `CinemachineImpulseListener`/`Source`. Follow/LookAt = Player, FOV 65.
+  - The musou feel is preserved by a thin **`PlayerCameraRig`** controller that feeds the orbit axes (HorizontalAxis = world
+    yaw, VerticalAxis = pitch): stay-behind from actual velocity, anti-spin back-pedal cutoff, hold-Ctrl-mouse / right-stick orbit,
+    ease-back-behind on release — i.e. all the old `ThirdPersonCamera` behaviour, now driving Cinemachine instead of the transform.
+  - Camera-relative movement already worked (PlayerController reads `Camera.main`); unchanged. Old `ThirdPersonCamera.cs`
+    **deleted** and its component removed from Main Camera. `Shake(amount,duration)` ported to a Cinemachine **Impulse**
+    (static `PlayerCameraRig.Shake` facade; the 3 callers — hit-juice ×2, brute slam — repointed).
+  - Verified in play: correct behind/above framing, player low-center, zero console errors (screenshot captured).
+  - **FEEL TO CHECK / tune (all on `PlayerCameraRig` or the CM components):** `shakeForceScale` (8 — impulse↔old-offset mapping
+    is approximate, may want bigger/smaller), orbit sensitivity, `autoFollowStrength`, pitch range, Deoccluder collision mask
+    (set to Default layer; verify it ignores enemies). The bespoke anti-spin is ported but worth a back-pedal sanity check.

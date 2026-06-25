@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: efd89a358890cf44c98ea44e2c471280, type: 3}
+  m_Name: Augment_SecondWind
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.Augment
+  title: Second Wind
+  description: Heal 50% of max health.
+  rarity: 0
+  allowedClasses: -1
+  tags: 2
+  maxStacks: 0
+  effects:
+  - rid: 8406688341614395535
+  references:
+    version: 2
+    RefIds:
+    - rid: 8406688341614395535
+      type: {class: HealEffect, ns: Hordebreakers, asm: Assembly-CSharp}
+      data:
+        flat: 0
+        fractionOfMax: 0.5

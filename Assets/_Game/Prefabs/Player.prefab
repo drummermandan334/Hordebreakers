@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 570104084769209873}
   - component: {fileID: 712123613240177436}
   - component: {fileID: 8622645681966147586}
-  - component: {fileID: 2848254436905852526}
   - component: {fileID: 2220684667958290512}
   m_Layer: 9
   m_Name: Player
@@ -77,43 +76,29 @@ MonoBehaviour:
   enemyMask:
     serializedVersion: 2
     m_Bits: 256
-  detonationVfxPrefab: {fileID: 0}
   modelRoot: {fileID: 8669540273521853009}
   animator: {fileID: 8722805443360106377}
   hitFlash: {fileID: 0}
   meleeArcDot: 0.35
-  lightSlashVfx: {fileID: 1652400581503036, guid: 1f8b293f4d55bbc418cffe1b7505d6ed, type: 3}
-  heavySlashVfx: {fileID: 1473356317183098, guid: 16b154ffbfe6c5841b0a46456345a632, type: 3}
-  weaponSocket: {fileID: 0}
-  slashLocalPos: {x: 0, y: 1, z: 1.2}
-  slashLocalEuler: {x: 0, y: 0, z: 0}
+  meleeHitboxCenterFactor: 0.5
+  meleeHitboxRadiusFactor: 0.45
   attackStep: 2.5
   lungeStep: 4
   attackStepTime: 0.12
   gripBlendSpeed: 10
   armLayerWeight: 0.7
+  faceTurnSpeed: 15
+  animSpeedDamp: 0.1
   jumpSpeed: 7
   gravity: 20
   airControl: 0.7
-  detonateDelay: 0.14
+  hitShake: {x: 0.07, y: 0.08}
+  hitStop: {x: 0.03, y: 0.3}
+  finisherShake: {x: 0.16, y: 0.14}
+  finisherHitStop: {x: 0.07, y: 0.12}
+  damageShake: {x: 0.18, y: 0.18}
+  damageHitStop: {x: 0.05, y: 0.25}
   invincible: 0
---- !u!114 &2848254436905852526
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7200540873863231687}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 69418c7241c175f41977c5cabe233e20, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.AutoWeapon
-  data: {fileID: 11400000, guid: cfc83ad0576409c42aa5233119fd45e3, type: 2}
-  enemyMask:
-    serializedVersion: 2
-    m_Bits: 256
-  poolSize: 32
 --- !u!114 &2220684667958290512
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -132,11 +117,12 @@ MonoBehaviour:
     m_Bits: 256
   aimRoot: {fileID: 8669540273521853009}
   damage: 14
-  marks: 1
   speed: 22
   lifetime: 2
   cooldown: 0.55
   aimAssistRange: 14
+  aimAssistConeDot: 0.4
+  aimVerticalClamp: 2
   poolSize: 16
 --- !u!1001 &2640086284421255992
 PrefabInstance:

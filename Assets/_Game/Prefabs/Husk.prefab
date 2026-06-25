@@ -9,10 +9,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3768800621790839080}
-  - component: {fileID: 2861409236241868211}
   - component: {fileID: 7270083097961013178}
   - component: {fileID: 1482134068124445769}
   - component: {fileID: 5631306810770974431}
+  - component: {fileID: 5977897991015393070}
   m_Layer: 8
   m_Name: Husk
   m_TagString: Untagged
@@ -36,20 +36,6 @@ Transform:
   - {fileID: 549152637073393773}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2861409236241868211
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 200088345215572852}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 69e785a6509bf6345be8c1e012cf650b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.Markable
-  markRenderer: {fileID: 466350101749334853}
-  markColor: {r: 1, g: 0.5, b: 0, a: 1}
 --- !u!136 &7270083097961013178
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -88,6 +74,26 @@ MonoBehaviour:
   modelRoot: {fileID: 549152637073393773}
   animator: {fileID: 487123151603181449}
   hitFlash: {fileID: 0}
+  attackTelegraph: {fileID: 0}
+  hitClip: {fileID: 8300000, guid: 089ce0173ae8ae44abaecd07ffbd6771, type: 3}
+  standoffRangeBase: 1.35
+  standoffRangeAggressionSlope: 0.6
+  attackCooldownBase: 1.4
+  attackCooldownAggressionSlope: 0.8
+  initialCooldownMin: 0.3
+  slotOffsetRange: 35
+  knockbackDecayRate: 12
+  ringApproachBuffer: 0.4
+  ringHoldStrength: 0.6
+  strafeSpeedBase: 0.3
+  strafeSpeedAggressionScale: 0.35
+  lungeConnectReachMult: 1.25
+  animSpeedApproach: 1
+  animDampApproach: 0.12
+  animSpeedStrafe: 0.45
+  animDampStrafe: 0.15
+  animDampStop: 0.1
+  fallbackDeathDuration: 1.1
 --- !u!114 &5631306810770974431
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -100,11 +106,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4cde4ed0edf828449c943101ffecb10, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.HitFlash
-  flashColor: {r: 1, g: 0.3, b: 0.3, a: 1}
-  flashDuration: 0.09
-  emissionIntensity: 3.5
-  scalePunch: 0.12
+  flashColor: {r: 1, g: 0.28, b: 0.22, a: 1}
+  flashDuration: 0.13
+  emissionIntensity: 5.5
+  scalePunch: 0.2
   punchTarget: {fileID: 0}
+--- !u!114 &5977897991015393070
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200088345215572852}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afd79dcc4b240c548ac4c1d9ee1afad9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.AttackTelegraph
+  telegraphColor: {r: 1, g: 0.45, b: 0.1, a: 1}
+  emissionIntensity: 2.6
+  pulseHz: 5
+  scalePulse: 0.05
+  pulseTarget: {fileID: 0}
 --- !u!1 &2077714056716460879
 GameObject:
   m_ObjectHideFlags: 0
@@ -358,11 +381,6 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 7290342898706740583}
   m_SourcePrefab: {fileID: 100100000, guid: 908987278249b014f91c9e63dd7174e8, type: 3}
---- !u!137 &466350101749334853 stripped
-SkinnedMeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 137878343086482382, guid: 908987278249b014f91c9e63dd7174e8, type: 3}
-  m_PrefabInstance: {fileID: 545244985937567883}
-  m_PrefabAsset: {fileID: 0}
 --- !u!95 &487123151603181449 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 95563511617423106, guid: 908987278249b014f91c9e63dd7174e8, type: 3}

@@ -1,231 +1,214 @@
 # HORDEBREAKERS — Game Design Document
 
-> **Working title.** Codename is fine to ship under; rename before Steam page goes up.
-> **Version:** 0.1 (initial foundation) · See [Changelog](#changelog) at the end.
-> **One-line pitch:** A 1–4 player online co-op brawler where you actively fight through Vampire-Survivors-scale hordes — your hands stay on the combat while auto-weapons handle the swarm.
-> **Fun hypothesis (the one thing that must feel good):** Wading into a packed horde, watching your auto-weapons stack marks on everything, and slamming a heavy attack to *detonate* a cluster into a satisfying burst — while dodging an elite's telegraphed slam. If that core isn't fun solo, nothing else matters. Prototype it first.
+> **Working title `[TBD]`.** Title and the human kingdom's name are intentionally deferred to the vertical slice.
+> **Version:** 0.3 · See [Changelog](#changelog).
+> **One-line pitch:** A 1–4 player online co-op action game where an enslaved human warrior fights to retake a fallen kingdom, stronghold by stronghold — deliberate, weighty crowd combat whose godlike power is *earned* through a run-defining Augment draft.
+> **Fun hypothesis (still the thing that must feel good):** A fight you have to *read* — dodging and blocking under real pressure when you're under-equipped — that slides toward exhilarating crowd-clearing power as your Augments compound. Discipline early, abandon earned late. If the early, under-equipped fight isn't satisfying on its own, tune that first.
 
 ---
 
 ## 1. Vision & Pillars
 
-This is a deliberate fusion of two genres that normally pull in opposite directions:
+This is an **action-RPG** built on a **Souls-deliberate** combat floor, at **action-RPG scale — dozens of enemies on screen at most, never hundreds.** Vampire Survivors is a *donor*, not the chassis — it lends exactly two ideas (spawn-point wave arenas; a randomized choose-from-three upgrade moment) and nothing else. Everything VS-flavored that made the prototype feel like "3D VS with sword swings" — auto-weapons, continuous mid-fight leveling, XP-gem vacuuming, the card-draft firehose of +5% trickles — has been cut.
 
-- **Beat-em-up DNA** — active, skill-expressive melee: combos, dodges, crowd control, hit-stop and juice. Co-op is native (Castle Crashers is the touchstone).
-- **Vampire Survivors DNA** — hundreds of enemies, a build that assembles itself mid-run from drops with synergies, escalating density, and roguelite meta-progression.
+Four pillars. If a feature serves none, cut it.
 
-Every design decision below is measured against four pillars. If a feature doesn't serve one, cut it.
-
-1. **Hands-on power fantasy.** You are *always* actively fighting. Combat is juicy and reads at a glance even with 200 enemies on screen.
-2. **Builds that change how you fight, not just your numbers.** Each run, drops recombine into a distinct playstyle and "oh, I'm *this* character this run" moments.
-3. **Better together.** Drop-in 1–4 player co-op where roles interlock — a 4-stack feels like a coordinated wrecking crew, not four people soloing in the same room.
-4. **Easy to start, deep to master, quick to replay.** 15–25 minute runs; roguelite meta keeps "one more run" alive. Synty's readable low-poly keeps hordes legible and performance high.
+1. **Deliberate combat that earns its power fantasy.** Every fight demands reading and answering enemies — dodge, block, spacing, stamina. The godlike crowd-clearing feeling is *earned* through the run, not the default state: hardest when you're under-equipped early, looser as your build compounds.
+2. **Every run, a different build.** The Augment draft reshapes *how you fight* each run, and its randomness deliberately swings difficulty — a lucky synergy spread feels god-tier, an unlucky one forces clean, disciplined play. Skill is the floor that keeps a low roll winnable. Short runs, roguelite replay.
+3. **Better together.** Drop-in 1–4 online co-op with interlocking roles — a 4-stack is a coordinated war-band, not four soloists in a room.
+4. **A kingdom worth retaking.** Each stronghold is a distinct occupying faction with its own roster, mechanics, and art; a serious reconquest carries a light, absurdist thread underneath. Synty's readable low-poly keeps the crowds legible and the frame budget healthy.
 
 ---
 
-## 2. Scope & Targets
+## 2. Narrative & Setting
+
+**The spine is the focus: a soldier retaking his homeland.** The theme underneath is delivered with a light, absurdist touch — woven through specific fictional events, never monologued at the player.
+
+### Premise
+A human kingdom `[TBD]` — once the most powerful and prosperous realm on the planet — fell, conquered from within. You are human: a former warrior of its army, now toiling in the invaders' slave pits. You've had enough. With a handful of like-minded humans you break out and begin taking the kingdom back, **stronghold by stronghold**.
+
+### The fall (subtext, not sermon)
+The realm was undone by betrayal and misplaced trust, exploited by enemies who saw a weakness and played a long game. The architects were the **elves** — the *last* race anyone would suspect, smug stewards of their own enlightenment — who quietly took key political positions and ran a cynical long-con. **They never fielded an army. They used the other races as unwitting muscle.**
+
+The twist that drives the whole tone: **the other races are dupes.** Goblins, undead, dwarves, and the rest were late-arriving opportunists who think they conquered a dying kingdom on their own steam — with no idea they were the elves' hired help. Each now occupies a stronghold, strutting as proud conquerors, sincerely and comically wrong.
+
+### Delivery (light / absurdist — the joke is on the elves)
+The elves are too self-congratulatory to keep the secret. The reveal is never a speech; it's an aside they can't resist, because not admiring their own cleverness would be a tragedy:
+- **Combat asides:** a losing elven commander sniffs *"You weren't conquered, you were... onboarded. Honestly, the paperwork was the hard part —"* then catches himself, *"...I've said too much."*
+- **Environmental gags:** a liberated elven war room where the invasion plan is a mortifyingly tidy filing system — labeled ledgers, a flowchart titled *Compassion: A Roadmap*, a commemorative tapestry of the whole scheme they couldn't resist weaving.
+- **Codex / loading voice:** insufferable elven historiography in euphemism — "a peaceful demographic transition," "a generous resettlement initiative" — the horror sitting in the gap between the bureaucratic language and what happened.
+- **Running gags:** the elves are *offended* anyone calls it an invasion (*"Invasion is such an ugly word. We prefer 'inheritance.'"*); the other races bristle at any hint they were pawns (*"We took this kingdom!"*) while the elves murmur *"Yes, yes, you were instrumental,"* and the muscle never quite hears it.
+
+**Dramatic irony runs the entire game.** The player pieces together the elven hand long before the other occupiers do. Each stronghold's villain gets a free comic arc — boasting about a victory that was never theirs. The **final stronghold (held by all the races together)** is where the truth surfaces: the muscle's dawning, too-late realization, played for comedy; the elves, naturally, find the whole thing *gauche*.
+
+The theme — a tolerant nation undone by having its compassion exploited — is present as flavor and subtext, in proportion, under a reconquest story that stays foreground. (Sequel seed, unstated in-game: the betrayed, enlightened muscle is a second game.)
+
+> **Tone:** heightened, satirical, a little grotesque. Authored and funny, not a thesis.
+
+---
+
+## 3. Scope & Targets
 
 | Aspect | Decision |
 |---|---|
 | Players | 1–4, **online co-op only** (no local split-screen in v1) |
-| Perspective | 3D third-person, **behind-player musou / action camera** (Dynasty Warriors-ish) |
-| Engine | Unity 6 LTS |
-| Art | Synty Polygon assets (low-poly stylized) |
-| Performance target | **60 FPS** on mid-range PC, host and clients |
-| Platform | PC first; Steam release if it's fun |
-| Run length | 15–25 minutes |
-| Audience | Friends first; Steam-ready if it holds up |
+| Genre | Action-RPG on a Souls-deliberate combat floor (action-RPG scale — dozens of enemies, not hundreds) |
+| Perspective | 3D third-person, **Elden-Ring-adjacent action cam** (behind & slightly above, **FOV ~50, close ~4.5m** — intimate, not pulled back) |
+| Engine | **Unity 6.3 LTS** (`6000.3.x`), **URP** |
+| Art | Synty Polygon (low-poly); a distinct faction pack per stronghold |
+| Performance target | **60 FPS**, host and clients |
+| Platform | PC first; Steam if it's fun |
+| Run length | ~20–40 min (a campaign of strongholds; tune as content grows) |
 
 ---
 
-## 3. Core Gameplay Loop
+## 4. Combat System
 
-### Moment-to-moment (0–30 seconds)
-Move under the musou action camera. Your **auto-weapons fire continuously** at nearby enemies, shredding chaff and stacking **marks** on whatever they hit. You weave **light-attack combos** into the crowd and time **dodges** through telegraphed elite attacks. When a cluster is marked, you land a **heavy attack to detonate** it — a big AoE burst that clears chaff and chunks elites.
-- **Feedback:** hit-stop on heavy hits, screen-shake + flash on detonations, XP gems popping and streaming toward you.
-- **Reward:** the *whump* of a detonation clearing a knot of enemies; XP; the occasional drop.
+The core problem v0.2 solves: the prototype felt like *3D Vampire Survivors with swings* — passive, mashy. The fix is a **deliberate, committal combat floor** whose power fantasy is **earned through Augments**, not handed over by default.
 
-### A run / session (15–25 minutes)
-Escalating **wave-rounds** in an arena.
-1. A wave spawns a swarm with rising density and new enemy types.
-2. Clear it → short **breather** (~10–20s): enemies cleared, team regroups.
-3. Short **breather**: regroup and optionally spend gold at a shrine. (Level-up upgrade choices resolve once the arena is cleared — see §6.3.)
-4. Next wave, denser and nastier.
-5. Every **few waves, a boss** — a full manual skill check.
-6. **Final boss = run win.** All players downed simultaneously = run loss.
+### 4.1 Design tension & its resolution
+Souls-deliberate and the action-RPG power fantasy pull in opposite directions. They're reconciled by **putting the power curve in the build, not the baseline:**
+- The **baseline character stays deliberate all game** — committal attacks, real recovery, punishable mistakes, mandatory defense.
+- **Augments bend it toward abandon.** "Wave a huge sword through the crowd with impunity" is a *build outcome* (poise/hyperarmor, lifesteal, crowd-clear, stamina refunds), not the starting state.
+- Therefore difficulty is **front-loaded**: under-equipped early = combat at its most disciplined; as Augments compound, you slide toward the power fantasy. The curve emerges from progression, not a difficulty slider.
 
-The breather is the heartbeat: it's where the build decision happens and where co-op regroups/revives.
+What stops button-mashing is the **enemies**, not a restrictive moveset: even chaff can hurt and *interrupt* you, elites and commanders demand real defensive reads, so you cannot ignore the crowd and swing through it. The power-fantasy *feeling* comes from clearing a crowd you've **earned the tools** to clear — never from enemies being harmless. (Action-RPG scale: dozens at most, never hundreds.)
 
-### Meta (hours–weeks)
-Banked currency between runs unlocks: **new characters** (each a distinct kit + role), **new weapons added to the drop pool**, **small permanent upgrades**, and **harder difficulty tiers** for better rewards. The "one more run — let's try the new character together" hook.
-
----
-
-## 4. Combat System (the crux)
-
-The single most important design problem this game has: **in a melee + auto hybrid, auto-weapons must not scale so hard that manual combat becomes pointless.** If that happens, you've accidentally built pure Vampire Survivors and killed Pillar #1. Two structural mechanisms prevent it.
-
-### 4.1 Division of labor (via enemy taxonomy)
-Auto-weapons handle **breadth** (the swarm); manual melee handles **depth** (the threats). As a run escalates, *both* pressures grow — more chaff (autos scale to match) and more/tougher elites (manual skill + build scale to match) — so neither system ever goes vestigial. See [§5 Enemy Taxonomy](#5-enemy-taxonomy).
-
-### 4.2 The synergy loop: Mark → Detonate
-This is what makes "hybrid" mean something instead of two parallel games running side by side.
-
-**Mechanic: Mark**
-- **Purpose:** give auto-weapons a payoff the player actively triggers.
-- **Input:** any auto-weapon hit applies 1+ stacks of *Mark* to an enemy.
-- **Output:** a visible stacking status (glow/icon intensity scales with stacks). Marks decay after `[PLACEHOLDER: mark duration ~4s]` if not refreshed.
-- **Edge cases:** capped at `[PLACEHOLDER: max stacks]`; bosses can be marked but at reduced effect.
-
-**Mechanic: Detonate**
-- **Purpose:** the core skill-expression verb; converts passive auto-DPS into burst the player aims and times.
-- **Input:** **heavy attack** (also does solid raw damage on its own).
-- **Output:** detonates all Marks within `[PLACEHOLDER: detonation radius]` around the impact. Damage scales with total mark stacks consumed → clears chaff in a burst AND chunks elites.
-- **Why it scales right:** more autos = more marks = bigger detonations. The manual layer stays relevant and grows *more* impactful as the build escalates — exactly the arc we want (carry early, godlike late, hands always busy).
-- **Tuning levers:** mark duration, max stacks, detonation radius, damage-per-stack, heavy-attack speed.
-
-This loop also seeds build identity: **detonation builds** (marks + detonation upgrades), **raw-auto builds** (more/stronger autos, less manual), **bruiser builds** (manual-combo heavy, autos as support). → Pillar #2.
-
-> *Lighter-weight alternative if detonate proves fiddly in playtest:* a **Fury/Heat** loop where manual hits charge a meter that temporarily supercharges autos. Simpler, but less interactive. Keep in back pocket.
-
-### 4.3 Manual moveset
+### 4.2 Moveset
 | Action | Role | Notes |
 |---|---|---|
-| **Light attack** | Fast 3-hit combo string | Low per-hit damage; chaff cleanup, gap-filler, builds combo |
-| **Heavy attack** | The **Detonator** | Slower, high single-target damage + detonates marks in AoE |
-| **Dodge** | Short dash + i-frames | Cooldown-gated; defensive + repositioning; upgradeable (e.g. leaves a trail) |
-| **Auto-weapons** | Continuous breadth DPS | Fire on timers, VS-style; apply marks; targeting per-weapon (nearest / forward arc / random) |
+| **Light attack** | Fast combo string | Crowd-engagement, lower commitment; chains into heavy |
+| **Heavy attack** | Committal crowd-clear / launcher | Big, weighty swings with knockback/launch and real recovery; costs a stamina chunk |
+| **Dodge** | Defensive reposition | I-frames; **stamina-gated** |
+| **Block** | Mitigation under pressure | Chips + costs stamina; not a free turtle answer |
+| **Musou meter** | Earned release valve | Builds from dealing/taking hits; unleashes a **screen-clearing finisher with i-frames** |
+| **Secondary / thrown** | Manual ranged option | A player-triggered throw (not auto-fire); a tunable target for Augments |
+| **Abilities** | Dynasty-Warriors-style specials | The **Grand Ability System (GAS)** — see §6/§11; granted/upgraded via Augments, built server-authoritative for co-op from the start |
 
-**Targeting & feel:** **auto-facing / soft lock** on melee — your attacks snap toward the nearest enemy in your facing arc — to keep combat accessible in chaos. Gamepad: left stick move, right stick face/aim; KBM: WASD + mouse aim. Controller-friendly throughout (likely how friends will play).
+Movement is camera-relative. Facing follows your movement/aim; on a swing, a subtle, tunable facing assist rotates you a few degrees toward the nearest enemy in a narrow aim cone so attacks connect in a crowd — never a lock-on or positional pull, and tunable to zero for fully manual facing. Controller-first.
 
-### 4.4 Juice requirements (Pillar #1, non-negotiable)
-Readability and feel at horde scale: clear enemy silhouettes (Synty helps), telegraphs reinforced with height/animation cues (see §7), distinct detonation VFX, hit-stop on heavies, screen-shake scaled to detonation size, audio that cuts through density. Budget VFX carefully — see [§9 Tech](#9-technical-architecture).
+### 4.3 Stamina — a rhythm, not a noose
+Stamina shapes *how* you fight (pace aggression, time defense, don't spam) without an empty bar being how you lose the run. **Pressure, not punishment.** This is the load-bearing distinction from Souls — it is deliberately *less harsh and unforgiving*. Levers:
+- **Movement is free.** Only attacks, dodge, and block cost stamina — walking/repositioning never does, so you can always reposition to breathe.
+- **Fast regen, short delay.** The bar returns quickly once you stop spending; being empty is a brief "reset and breathe" beat, `[PLACEHOLDER: regen rate, regen delay ~0.5s]`.
+- **Empty ≠ defenseless** (the key softener). Running dry doesn't lock out defense: you keep a weaker "stumble" dodge and block still *partially* mitigates rather than failing open. You're worse off empty, never helpless.
+- **Generous i-frames + input buffer.** Forgiving dodge windows and buffered inputs — Souls discipline without twitch-perfect timing. `[PLACEHOLDER: dodge i-frames, buffer window]`.
+- **Big swings are decisions, not bankruptcies.** Heavy/launcher attacks cost a chunk and have recovery — weighty to spend into — but never the thing that drops you to a death.
+
+**Stamina is itself a primary Augment dial:** bigger pool, faster regen, "heavy attacks cost no stamina," "a clean dodge refunds stamina," hyperarmor to avoid stagger-lock. The same bar that enforces discipline when under-equipped is what you progressively *loosen* into the power fantasy — a real constraint early, nearly vanished on a strong late-run build.
+
+### 4.4 Juice (Pillar #1)
+Weight reads through hitstop on heavies, knockback/launch and ragdolls on crowd clears, screen-shake scaled to impact, distinct Musou-release VFX, and audio that cuts through density. Reinforced via PrimeTween (unscaled-safe) + Cinemachine Impulse (see §11 juice pass). All telegraphs must read at the close behind-and-above camera angle — see §7.
 
 ---
 
 ## 5. Enemy Taxonomy
 
-Three tiers, each aimed at a different system. (Starter bestiary uses Synty Polygon-style archetypes; rename/retheme freely.)
+Four tiers, each aimed at a different demand. Rosters are **re-skinned per stronghold** to the occupying race (a goblin's chaff differs from the undead's), but the structural roles are constant.
 
-### Tier 1 — Swarm / Chaff *(the auto-weapon fodder)*
-Weak, numerous; this is the horde fantasy. Players should never be drowning in trivial 1-HP inputs — autos exist to clear these.
-- **Husk** — basic melee shambler. Baseline swarm unit.
-- **Runner** — fast, very low HP. Pressure/positioning threat in numbers.
-- **Spitter** — ranged chaff; lobs a slow, dodgeable projectile. Punishes standing still.
-- Drops: XP gems. Occasionally gold.
+### Tier 1 — Crowd / chaff *(the action-RPG fodder)*
+Cleavable in numbers — the power-fantasy substrate — **but never harmless.** They can chip and *interrupt*, so you can't mindlessly swing through them. This is the Souls discipline at the lowest level.
 
-### Tier 2 — Elites / Bruisers *(the manual-skill threats)*
-High HP, **telegraphed** attacks; demand dodging and focused melee. This is where the beat-em-up skill lives.
-- **Brute** — slow, heavy ground slam (large **wind-up + raised AoE-ring** telegraph). Reward for dodging then detonating.
-- **Charger** — telegraphed dash across the arena; sidestep it.
-- **Warden** — front shield; must be flanked or staggered by a detonation. Teaches positioning/coordination.
-- Drops: more XP, gold, occasional upgrade.
+### Tier 2 — Wave units / bruisers *(the pressure)*
+Tougher, telegraphed attackers that demand defensive reads (dodge/block) and target priority. The reason a crowd is a *threat*, not just volume.
 
-### Tier 3 — Bosses *(full skill checks, wave milestones)*
-Multi-phase, pattern-based. Appear every few waves; the final boss ends the run.
-- **The Gravemaker** *(example boss)* — summons swarm adds (autos + detonate matter), plus telegraphed AoE patterns you must read and dodge.
-- Drops: guaranteed upgrade + meta currency on first kill of the run.
+### Tier 3 — Mini-boss / Elite commander *(the arena objective)*
+A single hard skill-check that can serve as the **arena's win condition** — carve through the crowd to reach and kill the officer. Sincere and puffed-up about a "conquest" that was never theirs (dramatic irony, §2).
 
-> **Co-op scaling note:** spawn counts, elite frequency, and boss HP scale with player count so a 4-stack still feels pressured. Exact scaling in the tuning sheet (`[PLACEHOLDER]`).
+### Tier 4 — Boss *(the stronghold capstone)*
+A massive, multi-phase encounter that **completes a Level**. The race's champion; the final stronghold's bosses are where the elven truth surfaces.
+
+> **Telegraphs (camera consequence):** even behind-and-above, ground decals foreshorten — so tells lean on **clear enemy wind-up animations and on-enemy/height cues** (the `AttackTelegraph` wind-up glow), not ground decals alone (§7).
+> **Co-op scaling:** crowd counts, elite frequency, and boss/commander HP scale with player count. `[PLACEHOLDER]` in the tuning sheet.
 
 ---
 
-## 6. Run Structure, Build & Progression
+## 6. Structure, Leveling & the Augment System
 
-### 6.1 Wave structure
-- A run = `[PLACEHOLDER: ~12–20]` wave-rounds over 15–25 min.
-- **Wave goal:** survive a timer *or* clear a kill quota (lean toward a short survive-timer with a density ramp; quota for "clear" waves to vary pacing).
-- **Breather** between waves: ~10–20s, enemies cleared, optional shrine purchase. (Level-up choices resolve when the whole arena is cleared — see §6.3 — not every breather.)
-- **Boss cadence:** every `[PLACEHOLDER: 3–5]` waves; final wave = boss.
-- **Escalation levers** (all in tuning sheet): enemies/wave, spawn rate, elite %, per-wave enemy stat scaling, wave modifiers (e.g. "double Runners," "no shrine this round").
+### 6.1 The three-tier nest
+- **Arena** — a set of **designed, escalating waves** (hand-tuned for an epic fight, *not* procedural VS density). Spawn points feed the crowd. Cleared by **killing the mini-boss/Elite commander OR completing an objective** (hold the gate, destroy the thing, escort, etc.) — so moment-to-moment isn't a single verb. On clear → **level up**.
+- **Level = a stronghold**, each occupied by a **different invading race**, each with its own roster, mechanics, and Synty art direction. Capped by a **massive Boss battle**.
+- **Run = the campaign** — a sequence of strongholds, culminating in the **final stronghold held by all races at once**.
 
-### 6.2 Win / lose & co-op revives
-- **Win:** defeat the final boss.
-- **Lose:** all players in the *downed* state at once.
-- **Downed state:** a felled player drops to the ground with a revive window; a teammate revives by standing nearby for `[PLACEHOLDER: ~3s]`. Optional self-revive on a charge/cooldown for solo play and clutch saves.
+**Liberating a stronghold unlocks more upgrade options** — tying meta-progression directly to the narrative spine of taking the kingdom back.
 
-### 6.3 In-run build (action-RPG layer, VS-flavored)
-- Enemies drop **XP gems** that bank into XP. **Level-ups resolve when an arena (spawn point) is defeated** — D&D-style, between encounters, **not** as a mid-fight pop-up. The **card-pick mechanic is retired** (played out); leveling reads as an action-RPG **level-up choice**.
-- **On level-up: choose 1 of 3** — amp an **ability** or a **stat** (e.g. detonation radius/damage, an auto-weapon, a melee/dodge upgrade, a passive). Exact option set TBD; *weapon evolution* (weapon + passive → evolved form, e.g. *Orbiting Axes + Haste → Whirlwind*) stays on the table.
-- **Gold/scrap:** secondary currency; spend at an optional shrine (buy a specific upgrade, heal) or bank the remainder toward meta.
-- *Prototype status:* the upgrade UI is **disabled** for now; XP/level still track, and the post-arena choice flow is to be built.
+### 6.2 Leveling — milestone, D&D-style
+**Level-ups occur only after combat ends** (an arena is cleared) — never mid-fight. There are **no XP gems and no continuous fill-bar** (those are the VS feel we cut). Clear an arena → gain a level → draft an Augment. Enemies may still drop loot/currency for the ARPG layer; they do not drip XP you vacuum. `[PLACEHOLDER: one level per arena vs. accumulate-and-cash-in — milestone is the default read.]`
 
-### 6.4 Meta-progression (between runs)
-- **Characters** — unlock new playable characters (each a distinct kit + signature auto + co-op role).
-- **Weapon pool** — add new weapons into the in-run drop pool.
-- **Permanent upgrades** — small persistent buffs (modest, to protect run-to-run skill expression).
-- **Difficulty tiers / modifiers** — unlock harder difficulties for better rewards and replay.
+### 6.3 The Augment system (the single canonical leveling path)
+**All** leveling upgrades flow through one system — a blend of **Hades boons × VS upgrades × League of Legends Arena augments**. It is explicitly *not* the VS card firehose: choices are **chunky and build-defining**, not a stream of +5% trickles. Every advancement — stat, weapon, ability, proc, evolution — is an Augment. There is no parallel upgrade path.
 
-### 6.5 Starter roster (co-op identity → Pillar #3)
-Four characters so a full 4-stack has interlocking roles. Solo, each is self-sufficient.
+**Delivery:** on arena clear, a **level-up panel** offers **3 randomized choices**, filtered to your class, weighted by rarity. (Augment-style cards in the LoL-Arena sense — refined and build-shaping — not VS draft cards.)
 
-| Character | Archetype | Kit highlights | Co-op role |
-|---|---|---|---|
-| **Vanguard** | Bruiser / Tank | High HP, heavy melee, taunt/aggro draw; signature auto = short-range shockwave | Holds the line; soaks elites |
-| **Tempest** | Zoner / CC | Strong auto-weapons, slows/knockback, lower HP | Thins and controls the swarm; **stacks marks fast** |
-| **Reaper** | Assassin / Detonator | Extra dodge/mobility, specializes in **detonations** (bigger/cheaper), bursts elites | Kills priority targets; cashes in Tempest's marks |
-| **Warden** | Support | Buffs, heals, shields, faster revives | Keeps the team alive; force-multiplier |
+**Architecture — composable effect ScriptableObjects** (in build by Code; keep the GDD aligned to the shipped model):
+- **Heterogeneous effects.** Each effect is its own SO type composed onto an Augment: **stat mods, weapon upgrades, ability grants, on-hit procs, and evolutions/transforms** — "anything," not just stat bumps. Effects apply via an `UpgradeContext` that can reach the player, weapons (e.g. the throw), and the ability system — not only `PlayerCombatData`.
+- **Class-gated pools.** Each Augment declares which character class(es) can roll it; the draft filters to the active character's class (a Barbarian never sees Archer augments). Baked into the data model now, before there are multiple classes.
+- **Rarity tiers + weighted randomization.** Augments have a rarity (common → legendary); the draft rolls weighted by a tunable `RarityWeightTable`. **This is the deliberate engine of difficulty variance** — a lucky roll of synergizing rares feels god-tier; an unlucky spread forces a combat-focused grind.
+- **Synergy-aware + evolutions.** Effects can read the current build, so Augments scale with, combine with, or **evolve** prior picks; **EvolutionEffect** consumes prerequisite augments and yields an evolved result. This is the Hades/LoL quality the system exists for.
+- **`PlayerLoadout`** is the single, run-scoped, **per-player** build model (taken augments, tag counts, weapons, future abilities) — created at run start, discarded at run end. It is the build, not a service locator: effects only get what the context hands them. Per-player by construction, so **co-op = four loadouts, no refactor**; run bookkeeping (level, waves) stays in the run manager.
 
-**The synergy fantasy:** Tempest blankets the crowd in marks → Reaper detonates for huge bursts → Vanguard holds the frontline → Warden sustains the whole thing. That interplay is the reason the game is more fun with friends.
+**Why the wild difficulty swing is intentional and fair:** the build lottery is the point (Pillar #2). It stays *fair* because the **deliberate-melee skill floor keeps a low-roll run winnable through execution** — a bad spread means "focus up and fight clean," not "you lost at the draft." The two systems reinforce each other.
+
+> The **Augment pool itself** and **per-class pools** for the co-op roster are content we flesh out over time; this section specifies the *system*, not the full catalog.
 
 ---
 
 ## 7. Camera & Controls
 
-- **Camera:** **musou / Dynasty-Warriors-style action cam** — third-person, positioned **behind and slightly above** the player at a **shallow downward tilt** (not top-down). The player sits low-center; the crowd reads ahead and around, receding into the distance. Pulled back with a **wide FOV (~65°)** so a good chunk of the surrounding horde stays on screen. Each player has their own camera (trivial online — the reason we skipped split-screen).
-- **Camera behavior:** yaw **eases to stay behind the player's movement heading** (gently damped; follows *movement*, not the per-swing soft-target face, so it doesn't jerk on attacks). **Manual orbit** on mouse X/Y (yaw + limited pitch); a **recenter** input snaps back behind the player (gamepad right-stick maps the same later). Smooth-follow on position (SmoothDamp).
-- **Telegraphs — must be reinforced at this angle:** the shallow musou tilt **flattens the ground plane**, so **ground decals alone no longer read reliably** (they foreshorten into the crowd). Tells must lean on **vertical / height cues** — raised AoE rings or pillars, overhead world-space markers, enemy-mounted tells — **and clear, readable enemy wind-up animations**. Treat ground decals as a *secondary* layer beneath a primary 3D/animation tell, never the sole telegraph.
-- **Controls (gamepad-first):** left stick move, **right stick camera orbit** (attacks auto-face nearest in arc), face buttons + triggers for light/heavy/dodge, **R3 to recenter**.
-- **Controls (KBM):** WASD move (camera-relative), **mouse X/Y orbit**, **MMB recenter**, LMB light / RMB heavy / Space dodge.
+- **Camera:** **Elden-Ring-adjacent action cam** — behind and slightly above the player, looking at the upper back/head; **close and intimate (not pulled back), narrow-ish FOV** so the character carries weight. Yaw **eases to stay behind the movement heading** (gently damped; it follows *movement*, NOT the per-swing facing assist, so it never jerks on a swing). **Manual orbit** (mouse / right-stick) with a **recenter** input. Smooth follow on position (SmoothDamp). Tuned defaults: **FOV 50, distance 4.5, pitch 15°, orbit height 2.0, look-at offset 1.5, follow damping 0.12** — all tunable on the `CM_PlayerCam` Cinemachine rig + `PlayerCameraRig`.
+- **Telegraph consequence (important):** even behind-and-above, ground decals foreshorten and read poorly — so enemy tells rely on **clear wind-up animations and on-enemy/height cues** (the `AttackTelegraph` wind-up glow already serves this), not ground decals alone. Account for this in every elite/boss attack.
+- **Controls:** controller-first. Left stick move, right stick camera; face buttons + triggers for light/heavy/dodge/block/Musou; abilities on remaining inputs. KBM mirror.
 
 ---
 
 ## 8. Multiplayer Architecture
 
-- **Model:** **listen server (host).** One player's machine runs server + client in one process; others join as pure clients. **Server-authoritative** (host is the authority) — correct for the horde sim and good-enough anti-cheat for PvE.
-- **Connectivity:** **Steam relay (SDR)** via a Steam transport. Friends join through the Steam friends list / a lobby; no port-forwarding; host IP hidden; free on Steam. (Unity Relay + Lobby is the cross-platform fallback if we ever leave Steam.)
-- **Stack:** **Netcode for GameObjects** (host mode; *Boss Room* sample as reference) with the transport swapped to Steam. **Mirror + FizzySteamworks** is the lighter alternative. Pin exact package versions at implementation time — they move.
-- **Horde sync (the hard part — see §10 Risks):** **do NOT replicate every enemy transform.** Host simulates the authoritative horde (ECS); clients receive lightweight state. Approach: spawn events + shared RNG seed, aggregated/batched updates, interest management, and lower update rates for distant enemies; clients render interpolated representations.
-- **Host leaves:** run ends in v1 (no host migration — it's genuinely hard). Consider save-and-resume later.
-- **Host load:** host runs the full sim *plus* its own rendering → host wants a decent machine. This is *why* we don't replicate every enemy.
+- **Model:** **listen server (host).** One player hosts (server + client in one process); others join as pure clients. **Server-authoritative** — correct for the enemy-crowd sim and good-enough anti-cheat for PvE. Build **GAS server-authoritative from the start** so abilities don't need re-architecting for co-op.
+- **Connectivity:** **Steam relay (SDR)** via a Steam transport — friends join through Steam, no port-forwarding, host IP hidden, free. (Unity Relay + Lobby is the cross-platform fallback.)
+- **Stack:** **Netcode for GameObjects** (host mode; *Boss Room* as reference) with the transport swapped to Steam; **Mirror + FizzySteamworks** the lighter alternative. Pin versions at implementation.
+- **Crowd sync (the hard part — §11):** **do not replicate every enemy.** Host simulates the authoritative enemy crowd; clients get lightweight state (spawn events + shared seed, aggregated/batched updates, interest management, lower rates for distant enemies) and render interpolated representations. At action-RPG scale (dozens) this is far more tractable than a musou swarm would be.
+- **Host leaves:** run ends in v1 (no host migration — genuinely hard). Consider save-and-resume later.
+- **Co-op roster:** the four-character roster needs **re-theming around action-RPG synergies** (launch→juggle, CC→burst-the-commander, frontline→support) — the old mark→detonate roles are gone. **Parked until co-op begins** (the prototype is solo); not blocking.
 
 ---
 
-## 9. Technical Architecture (high-level)
+## 9. Technical Architecture
 
-- **Hybrid ECS + GameObject:** the **enemy horde runs on DOTS/ECS + Burst/Jobs** (movement, targeting, collision — the thing that needs to scale to hundreds/thousands of agents). **Players, camera, UI, and bosses stay GameObject-based** (easier to author, fewer of them).
-- **Performance (60 FPS / ~16.7ms budget):** GPU instancing for swarm rendering, aggressive LODs, shared materials/atlases, and **object pooling everywhere** (never Instantiate/Destroy in tight loops). Profile from day one.
-- **Synty pipeline:** low-poly is ideal for hordes (cheap to render in bulk, silhouettes stay readable when packed). Organize asset folders early; combine/atlas materials to keep draw calls down.
-- **Data-driven design:** weapons, enemies, upgrades, and tuning live in **ScriptableObjects / data files**, not hardcoded — so the tuning sheet maps directly onto editable assets.
-
----
-
-## 10. Onboarding (target: >90% complete the first run unaided)
-
-- [ ] Core verb (move + light attack) usable within **30 seconds** of first control.
-- [ ] **First wave is safe** — guaranteed first success, no failure possible.
-- [ ] Introduce in low-stakes order: auto-weapon → **mark/detonate** → dodge → elite (first telegraph).
-- [ ] Player discovers at least one **synergy** through play, not text.
-- [ ] First run ends on a **hook** — an unlock teaser ("New character available").
+- **Pooled MonoBehaviours — DOTS/ECS likely unnecessary.** At **action-RPG scale (dozens on screen)**, pooled MonoBehaviours are comfortable at 60 FPS; ECS only earns its complexity at hundreds-to-thousands of agents. So the **DOTS/ECS migration is NOT an assumed step** — revisit it only if on-screen counts ever exceed what pooled GameObjects can hold at 60 FPS (likely never at this scale). **Players, camera, UI, bosses, and the enemy crowd all stay GameObject-based**; the prototype is **plain MonoBehaviour + object pooling**. **Do not prematurely convert; do not remove the pooling.**
+- **Performance (60 FPS).** GPU instancing for crowd rendering, aggressive LODs, shared materials/atlases, object pooling everywhere (no `Instantiate`/`Destroy` in loops), profile from day one.
+- **Data-driven.** Weapons, enemies, **Augments/effects**, and tuning live in ScriptableObjects mirroring `HORDEBREAKERS_Tuning.xlsx`; no magic numbers in code.
+- **Synty pipeline.** Low-poly suits crowds (cheap in bulk, readable when packed); a faction pack per stronghold; convert Built-in materials to URP on import.
+- **Prototype reality (so the doc matches the code):** combos are **timer + animator-tag driven** in `PlayerController` (not a formal FSM — that's fine, just not what "don't convert" is protecting). `GameManager` holds run state **in-memory only — no persistence layer yet.** The Augment system is the composable-SO model in §6, currently with a small starter effect library (StatMod, WeaponMod, GrantAbility-stub, Evolution); the **on-hit proc hook** is the next increment (it's the only effect that touches the swing path, so it lands isolated).
 
 ---
 
-## 11. Risks & Next Steps
+## 10. Onboarding (target: a new player completes the first stronghold unaided)
+
+- [ ] Core verb (move + light attack) usable within **30 seconds**.
+- [ ] **Defense taught early and as mandatory** — the first pressuring enemy forces a dodge/block; stamina introduced gently in a low-stakes beat.
+- [ ] **First arena is survivable** — early discipline, not early death; the front-loaded difficulty is "demanding," not "punishing."
+- [ ] First **Augment draft** lands within the first arena clear — the player feels the build lever immediately.
+- [ ] First run/stronghold ends on a **hook** — a new Augment, a new class, or the first elven aside that makes the player go "...wait, what did he just say?"
+
+---
+
+## 11. Risks, Build Order & Next Steps
 
 ### Biggest risk
-**Horde-scale co-op netcode.** Syncing hundreds of enemies across four clients is the single hardest engineering problem here. **De-risk early** with a dedicated networking spike (host-authoritative ECS horde + lightweight client representation) before committing to content.
+**Co-op netcode** — syncing the enemy crowd across four clients. At action-RPG scale (dozens, not hundreds) this is far more tractable than a musou swarm, but still de-risk with a dedicated networking spike before scaling content.
 
 ### Build order (de-risk fun before scale)
-1. **Single-player core prototype** — one character, 2–3 autos, one swarm tier + one elite, the **mark/detonate loop**, the musou action camera. *No netcode.* Answer the fun hypothesis. **If this isn't fun solo, stop and fix it.**
-2. **Vertical slice** — 1 character, 1 arena, ~5 waves + 1 boss, ~6 upgrades, the post-arena level-up choice flow.
-3. **Co-op networking spike** — listen server + Steam relay + the horde-sync approach above, 2 players first.
-4. **Scale** — more characters, weapons, enemies, waves, meta-progression.
+1. **Single-player core prototype** *(in progress)* — deliberate melee + stamina + dodge/block + Musou meter, on the Elden-Ring-adjacent action camera. Prove the §1 fun hypothesis: is the under-equipped fight satisfying on its own?
+2. **Augment system increments** *(in progress with Code)* — composable effect SOs, `PlayerLoadout`, class-gating, rarity weights, the four starter effects (incl. one working Evolution chain as proof). **Next increment:** the on-hit proc hook + `OnHitProcEffect`, landed isolated. Then update GDD §6 to the final shipped model.
+3. **Grand Ability System (Task A)** — 1–2 Dynasty-Warriors abilities alongside melee, damaging via `IDamageable`, server-authoritative, plugging into the Augment `GrantAbility` seam (no parallel path).
+4. **Vertical slice** — one stronghold (one race), its arena set (waves → mini-boss/objective) + a Boss, a real Augment pool, the level-up flow. **Name the kingdom + game title here.**
+5. **Co-op networking spike**, then **scale** — more strongholds/content. (DOTS migration only if pooled GameObjects ever can't hold 60 FPS — likely never at this scale; see §9.)
 
-### Open questions to resolve in playtest
-- Wave goal: survive-timer vs kill-quota mix?
-- Detonate vs Fury/Heat as the synergy loop?
-- How modest do permanent meta upgrades stay (to protect skill expression)?
-- Self-revive: always on, or solo-only?
+### Parked (deliberately, not forgotten)
+- **Co-op roster re-theme** around action-RPG synergies — when co-op begins.
+- **Augment pool + per-class pools** — grown continuously.
+- **Persistence/save layer** — not built yet; needed before meta-progression and save-resume.
+- **Names** (kingdom, title) — at the vertical slice.
 
 ---
 
@@ -233,6 +216,10 @@ Four characters so a full 4-stack has interlocking roles. Solo, each is self-suf
 
 | Version | Date | Notes |
 |---|---|---|
-| 0.1 | initial | Foundation: pillars, core loop, combat crux (mark/detonate + enemy taxonomy), run structure, starter roster, multiplayer (host + Steam relay), tech architecture, onboarding, risks/build order. All numeric values flagged `[PLACEHOLDER]` pending playtest — see companion tuning sheet. |
+| 0.1 | initial | Foundation: pillars, core loop, mark/detonate hybrid combat + enemy taxonomy, hybrid waves+boss, starter roster, host+Steam multiplayer, tech, onboarding. |
+| 0.3 | 2026-06-24 | **Action-RPG scale + camera reframe.** Confirmed **action-RPG scale — dozens on screen at most, never hundreds**; **musou framing removed** throughout (§1/§3/§4/§5/§7/§8). Camera retuned to **Elden-Ring-adjacent** values on the `CM_PlayerCam` Cinemachine rig + `PlayerCameraRig`: **FOV 50, distance 4.5, pitch 15°, orbit height 2.0, look-at offset 1.5, follow damping 0.12** (all tunable; intimate, not pulled back). §9: **DOTS/ECS reframed as likely unnecessary** at this scale — revisit only if pooled GameObjects can't hold 60 FPS; prototype stays pooled-MonoBehaviour, **no code removed**. The "Musou meter" *mechanic* name is kept (it's the screen-clear ultimate, distinct from the cut musou *framing*). |
+| 0.2.2 | 2026-06-24 | **Enemy telegraph legibility + a second archetype (in Code) & playtested.** New `AttackTelegraph` component: the whole enemy throb-glows (emissive MPB, crescendos toward the strike) during any wind-up — the asset-light, camera-angle-proof tell §5/§7 ask for; wired into the Husk lunge, the Charger, and the Brute slam (runs before `HitFlash` so a hit overrides it). New **Charger** archetype (Tier-2): data-driven on the existing `Enemy` via `EnemyData.archetype` (reuses the Husk prefab — no new art), rushes in and commits a long, very readable telegraphed dash that sweep-connects mid-charge with a big punish window if whiffed; spawns from the Husk pool (`WaveDirector.chargerData`, `firstChargerWave`/`chargerChance`). Open: ground-decal telegraphs still want a true height cue; more archetypes; an `EnemyBase` refactor (Enemy/Brute still duplicate). |
+| 0.2.1 | 2026-06-24 | **Combat floor implemented (in Code) & playtested.** §4.2 facing reworded to a subtle, tunable rotation-only aim assist (0 = manual). Built on `PlayerController`/`PlayerCombatData`: the **stamina** system (§4.3 — costs on attack/dodge, fast regen, *empty ≠ defenseless* stumble dodge, movement free); **block** (frontal-only, mitigation + chip + stamina cost, partial when empty); the **Musou meter** (builds from dealing/taking hits → i-frame screen-clear AoE); the **juice split** (hitstop on heavies only, lights snappy). Objective fixes: heavy hit/VFX contact sync, pooled Brute telegraph. HUD stamina + musou bars added. All values `[PLACEHOLDER]` — tune by feel. Still open: dodge cooldown vs stamina, enemy telegraph legibility, enemy variety, audio. |
+| 0.2 | this revision | **Major post-playtest pivot.** Identity reframed to **musou × action-RPG on a Souls-deliberate floor**; VS demoted to a donor of two ideas. **Cut:** auto-weapons, projectiles, mark/detonate, continuous mid-fight leveling, XP gems, the VS card draft, the elevated 3/4 camera. **Added/changed:** musou melee + **Musou meter**; **stamina-gated** dodge/block as a *rhythm, not a noose*; Augment-driven power curve with **front-loaded difficulty**; the **Augment system** (composable effect SOs, class-gated, rarity-weighted, synergy/evolution, `PlayerLoadout`) as the single canonical leveling path; **milestone (D&D-style) leveling** after combat only; the **three-tier nest** (Arena → stronghold Level → campaign Run) with arenas cleared by mini-boss *or* objective and stronghold-per-race structure; the **Dynasty-Warriors camera** + its telegraph consequence; a full **Narrative & Setting** section (enslaved-soldier reconquest spine; the elven long-con with the other races as unwitting muscle; light/absurdist delivery). Roster re-theme parked until co-op; names `[TBD]` until the vertical slice. Numeric values remain `[PLACEHOLDER]` pending playtest — tune in `HORDEBREAKERS_Tuning.xlsx`. |
 
-> **Living document.** Every significant revision gets a changelog row. Numeric values are hypotheses marked `[PLACEHOLDER]` until playtested — tune them in `HORDEBREAKERS_Tuning.xlsx`, not here.
+> **Living document.** Version every significant revision. Numeric values are hypotheses marked `[PLACEHOLDER]` until playtested.
