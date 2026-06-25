@@ -22,6 +22,9 @@ namespace Hordebreakers
         [Tooltip("Level / wave / kills readout. Optional.")]
         [SerializeField] private TMP_Text infoText;
 
+        // Cached last values so the text strings are only rebuilt when something changes (no per-frame GC).
+        private int _lastXp = -1, _lastXpToNext = -1, _lastLevel = -1, _lastWave = -1, _lastKills = -1;
+
         private void Start()
         {
             if (player == null)
@@ -40,8 +43,19 @@ namespace Hordebreakers
             GameManager gm = GameManager.Instance;
             if (gm == null) return;
             if (xpSlider != null) xpSlider.value = gm.XpToNext > 0 ? (float)gm.Xp / gm.XpToNext : 0f;
-            if (xpText != null) xpText.text = gm.Xp + " / " + gm.XpToNext;
-            if (infoText != null) infoText.text = "Lv " + gm.Level + "     Wave " + gm.Wave + "     Kills " + gm.Kills;
+
+            // Only rebuild the label strings when the underlying values change — these ran every frame and
+            // allocated 6 strings/frame (GC churn). Steady-state is now zero-alloc.
+            if (xpText != null && (gm.Xp != _lastXp || gm.XpToNext != _lastXpToNext))
+            {
+                _lastXp = gm.Xp; _lastXpToNext = gm.XpToNext;
+                xpText.text = string.Concat(gm.Xp.ToString(), " / ", gm.XpToNext.ToString());
+            }
+            if (infoText != null && (gm.Level != _lastLevel || gm.Wave != _lastWave || gm.Kills != _lastKills))
+            {
+                _lastLevel = gm.Level; _lastWave = gm.Wave; _lastKills = gm.Kills;
+                infoText.text = string.Concat("Lv ", gm.Level.ToString(), "     Wave ", gm.Wave.ToString(), "     Kills ", gm.Kills.ToString());
+            }
         }
     }
 }

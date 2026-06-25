@@ -195,7 +195,7 @@ namespace Hordebreakers
             _bruteAlive++;
         }
 
-        private void ReturnHusk(Enemy e) { _huskAlive = Mathf.Max(0, _huskAlive - 1); _huskPool.Return(e); }
+        private void ReturnHusk(Enemy e) { if (e == _dummy) _dummy = null; _huskAlive = Mathf.Max(0, _huskAlive - 1); _huskPool.Return(e); }
         private void ReturnBrute(Brute b) { _bruteAlive = Mathf.Max(0, _bruteAlive - 1); _brutePool.Return(b); }
     }
 }

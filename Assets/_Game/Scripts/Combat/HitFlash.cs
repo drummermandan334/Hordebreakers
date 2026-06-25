@@ -33,6 +33,7 @@ namespace Hordebreakers
             _mpb = new MaterialPropertyBlock();
             if (punchTarget == null) punchTarget = transform;
             _baseScale = punchTarget.localScale;
+            if (flashDuration < 0.001f) flashDuration = 0.001f;   // guard the _t / flashDuration divide
         }
 
         public void Flash()
