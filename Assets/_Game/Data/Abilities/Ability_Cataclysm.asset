@@ -17,14 +17,20 @@ MonoBehaviour:
   cooldown: 12
   staminaCost: 45
   effects:
-  - rid: 8406688341614395825
+  - rid: 8406688341614395884
   references:
     version: 2
     RefIds:
-    - rid: 8406688341614395825
-      type: {class: AoeDamageEffect, ns: Hordebreakers, asm: Hordebreakers}
+    - rid: 8406688341614395884
+      type: {class: MeteorEffect, ns: Hordebreakers, asm: Hordebreakers}
       data:
+        meteorPrefab: {fileID: 2163680491889895783, guid: 8b07d608c8e7538439f0307619f4227f, type: 3}
         radius: 8
         damage: 90
-        forwardOffset: 0
-        shake: {x: 0.4, y: 0.4}
+        forwardRange: 8
+        spawnHeight: 18
+        fallSpeed: 28
+        impactVfx: {fileID: 1809022330002312, guid: ed511b7776af6174e9b1255c7a81e59c, type: 3}
+        impactScale: 3.5
+        shake: {x: 0.4, y: 0.45}
+        autoDestroy: 4
