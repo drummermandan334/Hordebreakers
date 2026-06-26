@@ -106,6 +106,7 @@ namespace Hordebreakers
         private bool _musouActive;
         private float _musouTimer;
         private bool _hasBlockParam, _hasMusouParam;   // does the Animator define these (else skip to avoid warnings)
+        private int _blockLayer = -1;                  // upper-body Block override layer; weight driven by _blocking
 
         // timers / state
         private float _dodgeTimer;         // > 0 while dashing
@@ -163,7 +164,7 @@ namespace Hordebreakers
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (hitFlash == null) hitFlash = GetComponentInChildren<HitFlash>();
             _throw = GetComponentInChildren<ThrowWeapon>();
-            if (animator != null) { _gripLayer = animator.GetLayerIndex("RightHandGrip"); _armLayer = animator.GetLayerIndex("SwordArm"); _hasBlockParam = HasParam("Block"); _hasMusouParam = HasParam("Musou"); }
+            if (animator != null) { _gripLayer = animator.GetLayerIndex("RightHandGrip"); _armLayer = animator.GetLayerIndex("SwordArm"); _blockLayer = animator.GetLayerIndex("Block"); _hasBlockParam = HasParam("Block"); _hasMusouParam = HasParam("Musou"); }
             if (animator != null && animator.isHuman) _leftHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
             if (data == null)
             {
@@ -285,7 +286,8 @@ namespace Hordebreakers
                 SetAnimSpeed(moveDir.magnitude, dt);
             }
 
-            if (_hasBlockParam) animator.SetBool(AnimBlock, _blocking);
+            if (_blockLayer >= 0)   // fade the upper-body guard pose in/out as you raise/drop the block
+                animator.SetLayerWeight(_blockLayer, Mathf.MoveTowards(animator.GetLayerWeight(_blockLayer), _blocking ? 1f : 0f, Time.deltaTime * 10f));
         }
 
         private void TickTimers(float dt)
@@ -769,8 +771,9 @@ namespace Hordebreakers
 
             _hp -= amount;
             GainMusou(amount * data.musouGainTakenPerDamage);
-            if (hitFlash != null) hitFlash.Flash();
-            PlayerCameraRig.Shake(damageShake.x, damageShake.y);
+            if (!blocked && hitFlash != null) hitFlash.Flash();   // a clean block isn't a hurt — skip the red flash
+            float shakeMul = blocked ? 0.5f : 1f;
+            PlayerCameraRig.Shake(damageShake.x * shakeMul, damageShake.y * shakeMul);
             if (GameManager.Instance != null) GameManager.Instance.HitStop(damageHitStop.x, damageHitStop.y);
             if (_hp <= 0f) { Die(); return; }
 
