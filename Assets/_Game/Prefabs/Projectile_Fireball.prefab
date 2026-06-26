@@ -17,7 +17,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &600948681568654973
 Transform:
   m_ObjectHideFlags: 0
@@ -4672,7 +4672,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &7124987750460035564
 Transform:
   m_ObjectHideFlags: 0
@@ -9329,7 +9329,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2310247124201121336
 Transform:
   m_ObjectHideFlags: 0
@@ -18593,6 +18593,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hordebreakers::Hordebreakers.Projectile
   castRadius: 0.4
+  hitVfx: {fileID: 1879769179923522, guid: 65932b7368590234d8163da03c2055d8, type: 3}
+  hitVfxLifetime: 3
 --- !u!1 &7926850091249695636
 GameObject:
   m_ObjectHideFlags: 0

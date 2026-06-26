@@ -12,6 +12,10 @@ namespace Hordebreakers
         [Header("Tuning")]
         [Tooltip("Sphere radius of the per-frame hit cast (how 'fat' the projectile reads against colliders).")]
         [SerializeField] private float castRadius = 0.25f;
+        [Tooltip("Impact VFX spawned at the hit point (e.g. a fireball explosion). Optional.")]
+        [SerializeField] private GameObject hitVfx;
+        [Tooltip("Auto-destroy the spawned hit VFX after this long.")]
+        [SerializeField] private float hitVfxLifetime = 3f;
 
         private Vector3 _dir;
         private float _damage;
@@ -39,6 +43,7 @@ namespace Hordebreakers
             {
                 Collider col = hit.collider;
                 if (col.TryGetComponent(out IDamageable d) && d.IsAlive) d.TakeDamage(_damage, transform.position);
+                SpawnHitVfx(hit.point);
                 Done();
                 return;
             }
@@ -52,6 +57,14 @@ namespace Hordebreakers
         {
             _active = false;
             _onComplete?.Invoke(this);
+        }
+
+        // The bolt fires a few times a second, so a plain Instantiate/Destroy here is negligible (no pool needed).
+        private void SpawnHitVfx(Vector3 point)
+        {
+            if (hitVfx == null) return;
+            GameObject fx = Instantiate(hitVfx, point, Quaternion.identity);
+            Destroy(fx, hitVfxLifetime);
         }
     }
 }
