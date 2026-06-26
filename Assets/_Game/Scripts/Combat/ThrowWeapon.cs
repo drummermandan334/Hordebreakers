@@ -17,7 +17,8 @@ namespace Hordebreakers
 
         [Header("Tuning")]
         [SerializeField] private float damage = 14f;
-        [SerializeField] private float speed = 15f;     // vestigial upgrade hook; the FX drives its own flight speed
+        [Tooltip("Bolt flight speed — drives the fireball FX's particle Start Speed at spawn.")]
+        [SerializeField] private float speed = 15f;
         [SerializeField] private float cooldown = 0.55f;
         [Tooltip("Auto-destroy the spawned fireball after this long (covers flight + explosion).")]
         [SerializeField] private float fxLifetime = 4f;
@@ -61,6 +62,13 @@ namespace Hordebreakers
             }
 
             GameObject go = Instantiate(fireballPrefab, origin, Quaternion.LookRotation(dir));
+            if (go.TryGetComponent(out ParticleSystem ps))   // the FX self-drives its flight; sync its speed to the tunable
+            {
+                ParticleSystem.MainModule m = ps.main;
+                m.startSpeed = speed;
+                ps.Clear(true);
+                ps.Play(true);
+            }
             if (go.TryGetComponent(out FireballProjectile fp)) fp.Init(damage, fxLifetime);
         }
 
