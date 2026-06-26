@@ -89,6 +89,10 @@ namespace Hordebreakers
         [SerializeField] private GameObject musouVfx;
         [SerializeField] private float musouVfxScale = 1f;
 
+        [Header("Starting abilities")]
+        [Tooltip("Abilities the player starts the run with — slot order = list order, cast with 1-4 / d-pad. Augments grant more on top.")]
+        [SerializeField] private List<AbilityDefinition> startingAbilities = new List<AbilityDefinition>();
+
         private CharacterController _cc;
         private Transform _camT;
         private ThrowWeapon _throw;
@@ -172,6 +176,7 @@ namespace Hordebreakers
             _hp = data.maxHp;
             _stamina = data.maxStamina;
             _loadout = new PlayerLoadout(characterClass, _throw);   // run-scoped build model
+            for (int i = 0; i < startingAbilities.Count; i++) _loadout.GrantAbility(startingAbilities[i]);   // sorcerer's base spell kit
         }
 
         /// <summary>Apply a level-up augment: runs every effect against the runtime stats + build loadout, then records it.</summary>

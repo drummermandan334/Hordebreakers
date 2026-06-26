@@ -967,6 +967,18 @@ PrefabInstance:
       propertyPath: meleeContactPhase
       value: 0.4
       objectReference: {fileID: 0}
+    - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: startingAbilities.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: 'startingAbilities.Array.data[0]'
+      value: 
+      objectReference: {fileID: 11400000, guid: de8f1559f452e5644b284f91c2678fa1, type: 2}
+    - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: 'startingAbilities.Array.data[1]'
+      value: 
+      objectReference: {fileID: 11400000, guid: 9df335ec3b6e26340bca2d52383e31a4, type: 2}
     - target: {fileID: 8668925678707020589, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
       value: -2.5667727
