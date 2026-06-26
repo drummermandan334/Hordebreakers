@@ -10,6 +10,14 @@ namespace Hordebreakers
     [RequireComponent(typeof(ParticleSystem))]
     public sealed class Meteor : MonoBehaviour
     {
+        [Header("Lingering fire (dissipates after the strike)")]
+        [Tooltip("Fire patches left at the impact (e.g. FX_Fire_Big_02 / _03). A random one is picked per patch.")]
+        [SerializeField] private GameObject[] lingerVfx;
+        [SerializeField] private int lingerCount = 4;
+        [SerializeField] private float lingerRadius = 5f;
+        [SerializeField] private float lingerScale = 1.5f;
+        [SerializeField] private float lingerLifetime = 6f;
+
         private PlayerController _player;
         private Vector3 _strike;
         private float _radius, _damage, _timer;
@@ -47,7 +55,28 @@ namespace Hordebreakers
                 if (!Mathf.Approximately(_impactScale, 1f)) go.transform.localScale *= _impactScale;
                 Destroy(go, 3f);
             }
+            SpawnLingeringFires();
             PlayerCameraRig.Shake(_shake.x, _shake.y);
+        }
+
+        // Scatter a few looping fire patches around the impact that play out and fade (don't loop forever).
+        private void SpawnLingeringFires()
+        {
+            if (lingerVfx == null || lingerVfx.Length == 0) return;
+            for (int i = 0; i < lingerCount; i++)
+            {
+                GameObject prefab = lingerVfx[Random.Range(0, lingerVfx.Length)];
+                if (prefab == null) continue;
+                Vector2 off = Random.insideUnitCircle * lingerRadius;
+                GameObject fire = Instantiate(prefab, _strike + new Vector3(off.x, 0f, off.y), Quaternion.identity);
+                if (!Mathf.Approximately(lingerScale, 1f)) fire.transform.localScale *= lingerScale;
+                foreach (ParticleSystem ps in fire.GetComponentsInChildren<ParticleSystem>(true))
+                {
+                    ParticleSystem.MainModule m = ps.main;
+                    m.loop = false;   // play out + fade rather than burning forever
+                }
+                Destroy(fire, lingerLifetime);
+            }
         }
     }
 }

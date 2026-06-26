@@ -408,7 +408,7 @@ namespace Hordebreakers
             {
                 if (_hits[i].TryGetComponent(out IDamageable d) && d.IsAlive) d.TakeDamage(data.musouDamage, origin);
             }
-            PlayerCameraRig.Shake(finisherShake.x * 2f, finisherShake.y * 1.5f);
+            PlayerCameraRig.Shake(finisherShake.x * 5f, finisherShake.y * 2.5f);   // big ultimate jolt
             if (GameManager.Instance != null) GameManager.Instance.HitStop(finisherHitStop.x, finisherHitStop.y);
             if (musouVfx != null)
             {

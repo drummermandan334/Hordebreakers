@@ -290,7 +290,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 2
+      scalar: 3.5
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -4942,6 +4942,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c05e2de992b7b104fa91f3a03549c51f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Hordebreakers::Hordebreakers.Meteor
+  lingerVfx:
+  - {fileID: 1345027383935582, guid: 508c9f007a2bf724d88361f16953bbac, type: 3}
+  - {fileID: 1208781713066404, guid: aafad909270f83046bc79c06fe30321a, type: 3}
+  lingerCount: 5
+  lingerRadius: 6
+  lingerScale: 1.5
+  lingerLifetime: 6
 --- !u!1 &3333036208766941229
 GameObject:
   m_ObjectHideFlags: 0

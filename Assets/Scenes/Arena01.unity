@@ -925,7 +925,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       propertyPath: musouVfxScale
-      value: 3
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       propertyPath: armLayerWeight

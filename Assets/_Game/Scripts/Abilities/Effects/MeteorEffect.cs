@@ -18,7 +18,9 @@ namespace Hordebreakers
         [Tooltip("Where the meteor lands if there's no locked target — this far in front of the player.")]
         [SerializeField] private float forwardRange = 8f;
         [Tooltip("Height above the strike point the meteor spawns at.")]
-        [SerializeField] private float spawnHeight = 18f;
+        [SerializeField] private float spawnHeight = 22f;
+        [Tooltip("Approach angle from horizontal (deg) — 45-60 = a diagonal streak across the sky over the player; 90 = straight down.")]
+        [SerializeField] private float incomingAngle = 55f;
         [Tooltip("Fall speed (drives the fireball's particle Start Speed + the impact timing).")]
         [SerializeField] private float fallSpeed = 28f;
 
@@ -37,8 +39,14 @@ namespace Hordebreakers
                 : player.transform.position + player.ModelRoot.forward * forwardRange;
             strike.y = player.transform.position.y;   // ground level
 
-            Vector3 spawn = strike + Vector3.up * spawnHeight;
-            GameObject go = UnityEngine.Object.Instantiate(meteorPrefab, spawn, Quaternion.LookRotation(Vector3.down));
+            // Angled approach: come in over the player toward the strike at incomingAngle from horizontal.
+            Vector3 horizDir = strike - player.transform.position; horizDir.y = 0f;
+            horizDir = horizDir.sqrMagnitude > 0.01f ? horizDir.normalized : player.ModelRoot.forward;
+            float ang = Mathf.Clamp(incomingAngle, 20f, 89f) * Mathf.Deg2Rad;
+            Vector3 spawn = strike + Vector3.up * spawnHeight - horizDir * (spawnHeight / Mathf.Tan(ang));
+            Vector3 fallDir = (strike - spawn).normalized;
+
+            GameObject go = UnityEngine.Object.Instantiate(meteorPrefab, spawn, Quaternion.LookRotation(fallDir));
             if (go.TryGetComponent(out ParticleSystem ps))   // the FX self-drives the fall; sync its speed
             {
                 ParticleSystem.MainModule m = ps.main;
@@ -46,7 +54,7 @@ namespace Hordebreakers
                 ps.Clear(true);
                 ps.Play(true);
             }
-            float strikeDelay = fallSpeed > 0.1f ? spawnHeight / fallSpeed : 1f;
+            float strikeDelay = fallSpeed > 0.1f ? Vector3.Distance(spawn, strike) / fallSpeed : 1f;
             if (go.TryGetComponent(out Meteor meteor))
                 meteor.Init(player, strike, radius, damage, impactVfx, impactScale, shake, strikeDelay, autoDestroy);
         }
