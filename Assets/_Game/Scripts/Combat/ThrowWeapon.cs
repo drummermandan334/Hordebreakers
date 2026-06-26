@@ -1,60 +1,53 @@
-using System;
 using UnityEngine;
 
 namespace Hordebreakers
 {
     /// <summary>
-    /// The player's thrown weapon — now the battle-sorcerer's magical bolt. Reuses the pooled
-    /// <see cref="Projectile"/>. <see cref="Fire"/> is driven by PlayerController's cast (the mirrored-L3
-    /// animation), spawning from the left hand toward an aim direction, snapping to a forward-cone enemy for a
-    /// little aim assist. The cooldown lives on the player's cast gate; this just spawns.
+    /// The battle-sorcerer's magical bolt. Spawns the self-driving fireball FX — which handles flight, trail, and
+    /// the collision-triggered explosion itself — aimed at the player's facing, snapping to a forward-cone enemy
+    /// for a little aim assist. Driven by PlayerController's cast (the mirrored-L3 animation); damage is dealt by
+    /// the fireball's <see cref="FireballProjectile"/> on particle impact.
     /// </summary>
     public class ThrowWeapon : MonoBehaviour
     {
-        [Header("Projectile")]
-        [SerializeField] private Projectile projectilePrefab;   // dagger prefab with a Projectile component
+        [Header("Bolt")]
+        [Tooltip("The fireball FX prefab (FireballProjectile + the self-driving particle systems).")]
+        [SerializeField] private GameObject fireballPrefab;
         [SerializeField] private LayerMask enemyMask;
-        [Tooltip("Facing source for the throw direction (the player's ModelRoot).")]
-        [SerializeField] private Transform aimRoot;
 
         [Header("Tuning")]
         [SerializeField] private float damage = 14f;
-        [SerializeField] private float speed = 22f;
-        [SerializeField] private float lifetime = 2f;
+        [SerializeField] private float speed = 15f;     // vestigial upgrade hook; the FX drives its own flight speed
         [SerializeField] private float cooldown = 0.55f;
+        [Tooltip("Auto-destroy the spawned fireball after this long (covers flight + explosion).")]
+        [SerializeField] private float fxLifetime = 4f;
         [Tooltip("Snap the throw to the nearest enemy within this range and a forward cone.")]
         [SerializeField] private float aimAssistRange = 14f;
-        [Tooltip("Aim-assist cone width: enemies whose direction·facing is below this are ignored (higher = narrower cone).")]
+        [Tooltip("Aim-assist cone: enemies whose direction·facing is below this are ignored (higher = narrower).")]
         [SerializeField] private float aimAssistConeDot = 0.4f;
         [Tooltip("Vertical aim is clamped to +/- this so throws stay roughly level.")]
         [SerializeField] private float aimVerticalClamp = 2f;
-        [SerializeField] private int poolSize = 16;
 
-        private ObjectPool<Projectile> _pool;
-        private Action<Projectile> _return;
         private readonly Collider[] _hits = new Collider[64];
 
-        // ---------- Upgrade hooks (driven by ThrowWeaponBuffEffect) ----------
+        // ---------- Upgrade hooks (driven by WeaponModEffect) ----------
         public float Damage { get => damage; set => damage = Mathf.Max(0f, value); }
         public float ProjectileSpeed { get => speed; set => speed = Mathf.Max(0f, value); }
         public float Cooldown { get => cooldown; set => cooldown = Mathf.Max(0.05f, value); }
 
         private void Awake()
         {
-            if (projectilePrefab == null)
+            if (fireballPrefab == null)
             {
-                Debug.LogError("[ThrowWeapon] Assign a dagger projectile prefab.", this);
+                Debug.LogError("[ThrowWeapon] Assign the fireball FX prefab.", this);
                 enabled = false;
-                return;
             }
-            _pool = new ObjectPool<Projectile>(projectilePrefab, poolSize);
-            _return = _pool.Return;
-            if (aimRoot == null) aimRoot = transform;
         }
 
-        /// <summary>Spawn a bolt from <paramref name="origin"/> toward <paramref name="dir"/> (snaps to a forward-cone enemy). Driven by the player's cast.</summary>
+        /// <summary>Spawn the fireball from <paramref name="origin"/> toward <paramref name="dir"/> (snaps to a forward-cone enemy). Driven by the player's cast.</summary>
         public void Fire(Vector3 origin, Vector3 dir)
         {
+            if (fireballPrefab == null) return;
             dir.y = 0f;
             if (dir.sqrMagnitude < 0.001f) dir = transform.forward;
             dir.Normalize();
@@ -67,9 +60,8 @@ namespace Hordebreakers
                 if (to.sqrMagnitude > 0.001f) dir = to.normalized;
             }
 
-            Projectile p = _pool.Get();
-            p.transform.SetPositionAndRotation(origin, Quaternion.LookRotation(dir));
-            p.Init(dir, damage, speed, lifetime, enemyMask, _return);
+            GameObject go = Instantiate(fireballPrefab, origin, Quaternion.LookRotation(dir));
+            if (go.TryGetComponent(out FireballProjectile fp)) fp.Init(damage, fxLifetime);
         }
 
         private Transform FindForwardTarget(Vector3 origin, Vector3 fwd)
