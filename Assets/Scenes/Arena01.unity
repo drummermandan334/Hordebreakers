@@ -792,6 +792,10 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2220684667958290512, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: speed
+      value: 50
+      objectReference: {fileID: 0}
+    - target: {fileID: 2220684667958290512, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       propertyPath: fireballPrefab
       value: 
       objectReference: {fileID: 2841152532578896945, guid: 45555405370c1fe4e9c10098b52f7a97, type: 3}
@@ -856,6 +860,10 @@ PrefabInstance:
       value: 18
       objectReference: {fileID: 0}
     - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: musouVfx
+      value: 
+      objectReference: {fileID: 1809022330002312, guid: ed511b7776af6174e9b1255c7a81e59c, type: 3}
+    - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       propertyPath: hitStop.x
       value: 0.02
       objectReference: {fileID: 0}
@@ -914,6 +922,10 @@ PrefabInstance:
     - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       propertyPath: lungeDuration
       value: 0.25
+      objectReference: {fileID: 0}
+    - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: musouVfxScale
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       propertyPath: armLayerWeight

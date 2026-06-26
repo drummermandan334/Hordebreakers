@@ -84,6 +84,11 @@ namespace Hordebreakers
         [Tooltip("DEBUG: player takes no damage (for feel-testing). Turn OFF for real runs.")]
         [SerializeField] private bool invincible = false;
 
+        [Header("Musou VFX")]
+        [Tooltip("Fire/explosion VFX spawned at the player when Musou fires.")]
+        [SerializeField] private GameObject musouVfx;
+        [SerializeField] private float musouVfxScale = 1f;
+
         private CharacterController _cc;
         private Transform _camT;
         private ThrowWeapon _throw;
@@ -400,6 +405,12 @@ namespace Hordebreakers
             }
             PlayerCameraRig.Shake(finisherShake.x * 2f, finisherShake.y * 1.5f);
             if (GameManager.Instance != null) GameManager.Instance.HitStop(finisherHitStop.x, finisherHitStop.y);
+            if (musouVfx != null)
+            {
+                GameObject go = Instantiate(musouVfx, origin, Quaternion.identity);
+                if (!Mathf.Approximately(musouVfxScale, 1f)) go.transform.localScale *= musouVfxScale;
+                Destroy(go, 4f);
+            }
         }
 
         private void TickMusou(float dt)

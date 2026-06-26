@@ -19,11 +19,24 @@ namespace Hordebreakers
         [Tooltip("Camera shake on cast — x = amplitude, y = seconds.")]
         [SerializeField] private Vector2 shake = new Vector2(0.2f, 0.25f);
 
+        [Header("Impact VFX")]
+        [Tooltip("Fire/explosion VFX spawned at the blast center.")]
+        [SerializeField] private GameObject impactVfx;
+        [Tooltip("Uniform scale applied to the spawned VFX (size it to the radius).")]
+        [SerializeField] private float impactScale = 1f;
+        [SerializeField] private float impactLifetime = 3f;
+
         public override void Activate(PlayerController player)
         {
             Vector3 center = player.transform.position + player.ModelRoot.forward * forwardOffset;
             player.DealAreaDamage(center, radius, damage);
             PlayerCameraRig.Shake(shake.x, shake.y);
+            if (impactVfx != null)
+            {
+                GameObject go = UnityEngine.Object.Instantiate(impactVfx, center, Quaternion.identity);
+                if (!Mathf.Approximately(impactScale, 1f)) go.transform.localScale *= impactScale;
+                UnityEngine.Object.Destroy(go, impactLifetime);
+            }
         }
     }
 }

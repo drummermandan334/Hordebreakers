@@ -511,7 +511,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: JumpAttack
-  m_Speed: 1
+  m_Speed: 1.1
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: 9070704947568947088}
@@ -1055,7 +1055,7 @@ AnimatorStateMachine:
     m_Position: {x: 480, y: 520, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 6716090724271197993}
-    m_Position: {x: 515, y: 585, z: 0}
+    m_Position: {x: 520, y: 580, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 3192424264199973144}
     m_Position: {x: 550, y: 650, z: 0}
@@ -1135,7 +1135,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: L2
-  m_Speed: 1
+  m_Speed: 1.1
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: -2362820716496938792}
@@ -1262,7 +1262,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: L1
-  m_Speed: 1
+  m_Speed: 1.1
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: 4844547731382358143}
@@ -1291,7 +1291,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: L3
-  m_Speed: 1
+  m_Speed: 1.2
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: -3012642954788260765}
@@ -1495,7 +1495,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: H3
-  m_Speed: 1.75
+  m_Speed: 1.35
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: 3079767468511465332}
@@ -1620,7 +1620,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: H1
-  m_Speed: 2
+  m_Speed: 1.35
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: -6467138496304866329}
@@ -1649,7 +1649,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: H2
-  m_Speed: 2
+  m_Speed: 1.35
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: -495741383465146890}
