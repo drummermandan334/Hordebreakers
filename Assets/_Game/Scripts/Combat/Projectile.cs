@@ -24,12 +24,16 @@ namespace Hordebreakers
         private LayerMask _mask;
         private Action<Projectile> _onComplete;
         private bool _active;
+        private TrailRenderer _trail;
+
+        private void Awake() { _trail = GetComponent<TrailRenderer>(); }
 
         public void Init(Vector3 dir, float damage, float speed, float life,
                          LayerMask mask, Action<Projectile> onComplete)
         {
             _dir = dir; _damage = damage; _speed = speed;
             _life = life; _mask = mask; _onComplete = onComplete; _active = true;
+            if (_trail != null) _trail.Clear();   // wipe the pooled trail so a reused bolt doesn't streak across the world
         }
 
         private void Update()
