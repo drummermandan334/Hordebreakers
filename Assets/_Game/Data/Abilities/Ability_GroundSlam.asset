@@ -18,6 +18,8 @@ MonoBehaviour:
   staminaCost: 25
   effects:
   - rid: 8406688341614395824
+  castClip: {fileID: 8300000, guid: def1e430d772ec54284f01e1d781e9f2, type: 3}
+  castVolume: 1
   references:
     version: 2
     RefIds:
@@ -31,3 +33,5 @@ MonoBehaviour:
         impactVfx: {fileID: 1809022330002312, guid: ed511b7776af6174e9b1255c7a81e59c, type: 3}
         impactScale: 2
         impactLifetime: 3
+        impactClip: {fileID: 8300000, guid: 70df6c63f617caa479096dbb53a0d54f, type: 3}
+        impactVolume: 1

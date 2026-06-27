@@ -28,6 +28,7 @@ namespace Hordebreakers
             if (d != null && d.IsAlive)
             {
                 _spent = true;
+                CombatAudio.PlayFireImpact(transform.position);   // explosion, distinct from melee hits (clips live on CombatAudio)
                 d.TakeDamage(_damage, transform.position);
             }
         }

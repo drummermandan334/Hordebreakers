@@ -29,6 +29,10 @@ namespace Hordebreakers
         [SerializeField] private float impactScale = 3.5f;
         [SerializeField] private Vector2 shake = new Vector2(0.4f, 0.45f);
         [SerializeField] private float autoDestroy = 4f;
+        [Tooltip("Explosion / boom played at the strike point when the meteor lands.")]
+        [SerializeField] private AudioClip impactClip;
+        [Range(0f, 1f)]
+        [SerializeField] private float impactVolume = 1f;
 
         public override void Activate(PlayerController player)
         {
@@ -56,7 +60,7 @@ namespace Hordebreakers
             }
             float strikeDelay = fallSpeed > 0.1f ? Vector3.Distance(spawn, strike) / fallSpeed : 1f;
             if (go.TryGetComponent(out Meteor meteor))
-                meteor.Init(player, strike, radius, damage, impactVfx, impactScale, shake, strikeDelay, autoDestroy);
+                meteor.Init(player, strike, radius, damage, impactVfx, impactScale, shake, strikeDelay, autoDestroy, impactClip, impactVolume);
         }
     }
 }

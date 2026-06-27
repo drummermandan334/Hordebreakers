@@ -29,6 +29,8 @@ namespace Hordebreakers
         [Tooltip("Vertical aim is clamped to +/- this so throws stay roughly level.")]
         [SerializeField] private float aimVerticalClamp = 2f;
 
+        // Fireball cast + impact SFX live on CombatAudio (one editable place); see CombatAudio.PlayFireballCast / PlayFireImpact.
+
         private readonly Collider[] _hits = new Collider[64];
 
         // ---------- Upgrade hooks (driven by WeaponModEffect) ----------
@@ -60,6 +62,8 @@ namespace Hordebreakers
                 to.y = Mathf.Clamp(to.y, -aimVerticalClamp, aimVerticalClamp);
                 if (to.sqrMagnitude > 0.001f) dir = to.normalized;
             }
+
+            CombatAudio.PlayFireballCast(origin);
 
             GameObject go = Instantiate(fireballPrefab, origin, Quaternion.LookRotation(dir));
             if (go.TryGetComponent(out ParticleSystem ps))   // the FX self-drives its flight; sync its speed to the tunable

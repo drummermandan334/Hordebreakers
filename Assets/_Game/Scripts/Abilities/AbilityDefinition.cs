@@ -20,8 +20,14 @@ namespace Hordebreakers
         public float staminaCost = 25f;
         [SerializeReference] public List<AbilityEffect> effects = new List<AbilityEffect>();
 
+        [Header("Audio")]
+        [Tooltip("Played at the player the instant the ability is cast (the incantation / fire whoosh). The booms live on the individual effects.")]
+        public AudioClip castClip;
+        [Range(0f, 1f)] public float castVolume = 1f;
+
         public void Activate(PlayerController player)
         {
+            if (player != null && castClip != null) CombatAudio.PlaySpell(castClip, player.transform.position, castVolume);
             if (effects == null) return;
             for (int i = 0; i < effects.Count; i++)
             {

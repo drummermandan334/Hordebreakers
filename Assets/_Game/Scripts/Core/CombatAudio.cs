@@ -20,21 +20,49 @@ namespace Hordebreakers
         [Header("Voices")]
         [Tooltip("Pooled voices for hits (lets simultaneous impacts layer).")]
         [SerializeField] private int hitVoices = 6;
+        [Tooltip("Pooled voices for spells/explosions, so a big boom isn't stolen by a flurry of hit sounds.")]
+        [SerializeField] private int spellVoices = 3;
         [Range(0f, 0.5f)]
         [SerializeField] private float defaultPitchVariance = 0.08f;
 
         [Header("Swing — whoosh on each attack (drop in clips to A/B; multiple = random variety)")]
         [SerializeField] private AudioClip[] swingClips;
+        [Tooltip("Heavier whoosh for heavy swings — falls back to the light swing clips if left empty.")]
+        [SerializeField] private AudioClip[] heavySwingClips;
         [Range(0f, 1f)]
         [SerializeField] private float swingVolume = 1f;
 
-        [Header("Hit — impact on connect")]
+        [Header("Hit — melee impact on connect (sword hits)")]
         [SerializeField] private AudioClip[] hitClips;
         [Range(0f, 1f)]
         [SerializeField] private float hitVolume = 1f;
 
+        [Header("Fireball — cast whoosh (the bolt leaving the hand)")]
+        [SerializeField] private AudioClip[] fireballCastClips;
+        [Range(0f, 1f)]
+        [SerializeField] private float fireballCastVolume = 1f;
+        [Tooltip("Seconds of dead air skipped at the START of the cast clip, so the whoosh lands ON the cast animation instead of arriving late. Raise until it syncs.")]
+        [SerializeField] private float fireballCastStartOffset = 0f;
+
+        [Header("Fire impact — the fireball's explosion on hit (separate from melee hits)")]
+        [SerializeField] private AudioClip[] fireImpactClips;
+        [Range(0f, 1f)]
+        [SerializeField] private float fireImpactVolume = 1f;
+
+        [Header("Musou — screen-clear ultimate boom")]
+        [SerializeField] private AudioClip[] musouClips;
+        [Range(0f, 1f)]
+        [SerializeField] private float musouVolume = 1f;
+
+        [Header("Dodge — roll whoosh (NOT a footstep)")]
+        [SerializeField] private AudioClip[] dodgeClips;
+        [Range(0f, 1f)]
+        [SerializeField] private float dodgeVolume = 1f;
+
         private AudioSource[] _hitPool;
         private int _next;
+        private AudioSource[] _spellPool;
+        private int _spellNext;
         private AudioSource _swingVoice;   // dedicated so each swing cuts the previous whoosh (no mash overlap)
 
         private void Awake()
@@ -44,6 +72,8 @@ namespace Hordebreakers
 
             _hitPool = new AudioSource[Mathf.Max(1, hitVoices)];
             for (int i = 0; i < _hitPool.Length; i++) _hitPool[i] = NewVoice("SfxHit" + i);
+            _spellPool = new AudioSource[Mathf.Max(1, spellVoices)];
+            for (int i = 0; i < _spellPool.Length; i++) _spellPool[i] = NewVoice("SfxSpell" + i);
             _swingVoice = NewVoice("SfxSwing");
         }
 
@@ -59,11 +89,15 @@ namespace Hordebreakers
 
         private void OnDestroy() { if (Instance == this) Instance = null; }
 
-        /// <summary>Play a swing whoosh. Restarts the dedicated swing voice, so mashing yields one clean whoosh per swing.</summary>
-        public static void PlaySwing(Vector3 position)
+        /// <summary>Play a swing whoosh. Restarts the dedicated swing voice, so mashing yields one clean whoosh per swing.
+        /// Heavy swings draw from the heavier whoosh set (falling back to the light set when none is assigned).</summary>
+        public static void PlaySwing(Vector3 position, bool heavy = false)
         {
             if (Instance == null) return;
-            AudioClip clip = Instance.Pick(Instance.swingClips);
+            AudioClip[] set = heavy && Instance.heavySwingClips != null && Instance.heavySwingClips.Length > 0
+                ? Instance.heavySwingClips
+                : Instance.swingClips;
+            AudioClip clip = Instance.Pick(set);
             if (clip == null) return;
             Instance.PlayOn(Instance._swingVoice, clip, position, Instance.swingVolume, Instance.defaultPitchVariance);
         }
@@ -84,6 +118,56 @@ namespace Hordebreakers
             Instance.PlayPooled(clip, position, volume, pitchVariance < 0f ? Instance.defaultPitchVariance : pitchVariance);
         }
 
+        /// <summary>Play a spell / explosion one-shot on the dedicated spell pool (won't be cut by hit sounds).</summary>
+        public static void PlaySpell(AudioClip clip, Vector3 position, float volume = 1f, float pitchVariance = -1f)
+        {
+            if (Instance == null || clip == null) return;
+            Instance.PlaySpellVoice(clip, position, volume, pitchVariance < 0f ? Instance.defaultPitchVariance : pitchVariance, 0f);
+        }
+
+        /// <summary>Fireball cast whoosh — clips + lead-in trim live on CombatAudio so the bolt's launch sound stays in sync.</summary>
+        public static void PlayFireballCast(Vector3 position)
+        {
+            if (Instance == null) return;
+            AudioClip clip = Instance.Pick(Instance.fireballCastClips);
+            if (clip == null) return;
+            Instance.PlaySpellVoice(clip, position, Instance.fireballCastVolume, Instance.defaultPitchVariance, Instance.fireballCastStartOffset);
+        }
+
+        /// <summary>Fireball impact explosion — its own editable clip set, distinct from the melee hit sounds.</summary>
+        public static void PlayFireImpact(Vector3 position)
+        {
+            if (Instance == null) return;
+            AudioClip clip = Instance.Pick(Instance.fireImpactClips);
+            if (clip == null) return;
+            Instance.PlaySpellVoice(clip, position, Instance.fireImpactVolume, Instance.defaultPitchVariance, 0f);
+        }
+
+        /// <summary>Musou ultimate boom.</summary>
+        public static void PlayMusou(Vector3 position)
+        {
+            if (Instance == null) return;
+            AudioClip clip = Instance.Pick(Instance.musouClips);
+            if (clip == null) return;
+            Instance.PlaySpellVoice(clip, position, Instance.musouVolume, Instance.defaultPitchVariance, 0f);
+        }
+
+        /// <summary>Dodge-roll whoosh — its own clip set (a footstep here would make no sense).</summary>
+        public static void PlayDodge(Vector3 position)
+        {
+            if (Instance == null) return;
+            AudioClip clip = Instance.Pick(Instance.dodgeClips);
+            if (clip == null) return;
+            Instance.PlaySpellVoice(clip, position, Instance.dodgeVolume, Instance.defaultPitchVariance, 0f);
+        }
+
+        private void PlaySpellVoice(AudioClip clip, Vector3 position, float volume, float pitchVariance, float startTime)
+        {
+            AudioSource a = _spellPool[_spellNext];
+            _spellNext = (_spellNext + 1) % _spellPool.Length;
+            PlayOn(a, clip, position, volume, pitchVariance, startTime);
+        }
+
         private AudioClip Pick(AudioClip[] clips)
         {
             if (clips == null || clips.Length == 0) return null;
@@ -97,7 +181,7 @@ namespace Hordebreakers
             PlayOn(a, clip, position, volume, pitchVariance);
         }
 
-        private void PlayOn(AudioSource a, AudioClip clip, Vector3 position, float volume, float pitchVariance)
+        private void PlayOn(AudioSource a, AudioClip clip, Vector3 position, float volume, float pitchVariance, float startTime = 0f)
         {
             a.Stop();
             a.transform.position = position;
@@ -105,6 +189,7 @@ namespace Hordebreakers
             a.pitch = 1f + Random.Range(-pitchVariance, pitchVariance);
             a.volume = volume;
             a.Play();
+            if (startTime > 0f && startTime < clip.length) a.time = startTime;   // skip dead air at the head so the sound lands on-beat
         }
     }
 }

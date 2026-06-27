@@ -26,11 +26,18 @@ namespace Hordebreakers
         [SerializeField] private float impactScale = 1f;
         [SerializeField] private float impactLifetime = 3f;
 
+        [Header("Impact audio")]
+        [Tooltip("Explosion / boom played at the blast center on impact.")]
+        [SerializeField] private AudioClip impactClip;
+        [Range(0f, 1f)]
+        [SerializeField] private float impactVolume = 1f;
+
         public override void Activate(PlayerController player)
         {
             Vector3 center = player.transform.position + player.ModelRoot.forward * forwardOffset;
             player.DealAreaDamage(center, radius, damage);
             PlayerCameraRig.Shake(shake.x, shake.y);
+            if (impactClip != null) CombatAudio.PlaySpell(impactClip, center, impactVolume);
             if (impactVfx != null)
             {
                 GameObject go = UnityEngine.Object.Instantiate(impactVfx, center, Quaternion.identity);

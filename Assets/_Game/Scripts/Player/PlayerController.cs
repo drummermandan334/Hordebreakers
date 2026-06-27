@@ -88,6 +88,7 @@ namespace Hordebreakers
         [Tooltip("Fire/explosion VFX spawned at the player when Musou fires.")]
         [SerializeField] private GameObject musouVfx;
         [SerializeField] private float musouVfxScale = 1f;
+        // Musou boom SFX lives on CombatAudio (one editable place); see CombatAudio.PlayMusou.
 
         [Header("Starting abilities")]
         [Tooltip("Abilities the player starts the run with — slot order = list order, cast with 1-4 / d-pad. Augments grant more on top.")]
@@ -96,6 +97,7 @@ namespace Hordebreakers
         private CharacterController _cc;
         private Transform _camT;
         private ThrowWeapon _throw;
+        private PlayerVoice _voice;
         private PlayerLoadout _loadout;
         private float _hp;
         private float _stamina;
@@ -152,6 +154,10 @@ namespace Hordebreakers
         public float StaminaNormalized => data != null && data.maxStamina > 0f ? Mathf.Clamp01(_stamina / data.maxStamina) : 0f;
         public float MusouNormalized => data != null && data.maxMusou > 0f ? Mathf.Clamp01(_musou / data.maxMusou) : 0f;
         public bool MusouReady => data != null && _musou >= data.maxMusou;
+        /// <summary>True while a melee combo swing OR the bolt cast is playing (both Attack-tagged) — lets FootstepAudio duck steps so they don't crowd combat.</summary>
+        public bool IsAttacking => InComboAttack();
+        /// <summary>True during a dodge roll — FootstepAudio kills steps here (the roll has its own whoosh instead).</summary>
+        public bool IsDodging => _dodgeTimer > 0f;
         /// <summary>Facing the player rotates toward — used by the throw weapon to aim.</summary>
         public Transform ModelRoot => modelRoot;
         /// <summary>The player's run-scoped build (taken augments, weapons, abilities). Wrapped by the augment context.</summary>
@@ -164,6 +170,7 @@ namespace Hordebreakers
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (hitFlash == null) hitFlash = GetComponentInChildren<HitFlash>();
             _throw = GetComponentInChildren<ThrowWeapon>();
+            _voice = GetComponent<PlayerVoice>();
             if (animator != null) { _gripLayer = animator.GetLayerIndex("RightHandGrip"); _armLayer = animator.GetLayerIndex("SwordArm"); _blockLayer = animator.GetLayerIndex("Block"); _hasBlockParam = HasParam("Block"); _hasMusouParam = HasParam("Musou"); }
             if (animator != null && animator.isHuman) _leftHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
             if (data == null)
@@ -412,6 +419,7 @@ namespace Hordebreakers
             }
             PlayerCameraRig.Shake(finisherShake.x * 5f, finisherShake.y * 2.5f);   // big ultimate jolt
             if (GameManager.Instance != null) GameManager.Instance.HitStop(finisherHitStop.x, finisherHitStop.y);
+            CombatAudio.PlayMusou(origin);
             if (musouVfx != null)
             {
                 GameObject go = Instantiate(musouVfx, origin, Quaternion.identity);
@@ -618,6 +626,7 @@ namespace Hordebreakers
             _dodgeTimer = data.dodgeDuration;
             _dodgeCdTimer = data.dodgeCooldown;
             modelRoot.rotation = Quaternion.LookRotation(_dodgeDir);
+            CombatAudio.PlayDodge(transform.position);   // roll whoosh (its own clip set on CombatAudio — not a footstep)
             if (animator != null) animator.SetTrigger(AnimDodge);
         }
 
@@ -630,12 +639,13 @@ namespace Hordebreakers
             if (!SpendStamina(cost)) return;   // too tired to swing — movement is free, so reposition while stamina regens
 
             _castSwing = false;   // a melee swing clears any pending cast
-            CombatAudio.PlaySwing(transform.position);   // swing whoosh (clips live on CombatAudio)
+            CombatAudio.PlaySwing(transform.position, heavy);   // swing whoosh (clips live on CombatAudio; heavier set for heavies)
             _comboStep = (InComboAttack() && _comboStep < 3) ? _comboStep + 1 : 1;   // chaining advances the slot; a fresh attack resets it
             AimFace();
             if (animator != null) animator.SetTrigger(heavy ? AnimHeavy : AnimLight);
 
             bool finisher = _comboStep >= 3;
+            if (_voice != null) _voice.Attack(heavy, finisher);   // chance-gated effort grunt (not every swing)
             StepForward(finisher ? lungeStep : attackStep);
 
             // Stage this swing's hit params; the hit is ARMED + resolved in Update off the animator state change
@@ -776,6 +786,7 @@ namespace Hordebreakers
             PlayerCameraRig.Shake(damageShake.x * shakeMul, damageShake.y * shakeMul);
             if (GameManager.Instance != null) GameManager.Instance.HitStop(damageHitStop.x, damageHitStop.y);
             if (_hp <= 0f) { Die(); return; }
+            if (!blocked && _voice != null) _voice.Hurt(amount);   // a clean block isn't a hurt — no hurt grunt
 
             // Flinch only when caught out — blocking absorbs the flinch; never mid-swing/dodge, off cooldown.
             if (!blocked && animator != null && _hitReactCdTimer <= 0f && !IsBaseInAttack() && _dodgeTimer <= 0f)
@@ -789,6 +800,7 @@ namespace Hordebreakers
 
         private void Die()
         {
+            if (_voice != null) _voice.Defeat();
             Debug.Log("[PlayerController] Player down. (Prototype: reload the scene to retry.)");
             gameObject.SetActive(false);
         }

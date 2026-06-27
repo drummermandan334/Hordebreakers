@@ -24,13 +24,17 @@ namespace Hordebreakers
         private GameObject _impactVfx;
         private float _impactScale;
         private Vector2 _shake;
+        private AudioClip _impactClip;
+        private float _impactVolume;
         private bool _struck;
 
         public void Init(PlayerController player, Vector3 strike, float radius, float damage,
-                         GameObject impactVfx, float impactScale, Vector2 shake, float strikeDelay, float autoDestroy)
+                         GameObject impactVfx, float impactScale, Vector2 shake, float strikeDelay, float autoDestroy,
+                         AudioClip impactClip = null, float impactVolume = 1f)
         {
             _player = player; _strike = strike; _radius = radius; _damage = damage;
             _impactVfx = impactVfx; _impactScale = impactScale; _shake = shake;
+            _impactClip = impactClip; _impactVolume = impactVolume;
             _timer = strikeDelay; _struck = false;
             Destroy(gameObject, autoDestroy);
         }
@@ -49,6 +53,7 @@ namespace Hordebreakers
             if (_struck) return;
             _struck = true;
             if (_player != null) _player.DealAreaDamage(_strike, _radius, _damage);
+            if (_impactClip != null) CombatAudio.PlaySpell(_impactClip, _strike, _impactVolume);
             if (_impactVfx != null)
             {
                 GameObject go = Instantiate(_impactVfx, _strike, Quaternion.identity);
