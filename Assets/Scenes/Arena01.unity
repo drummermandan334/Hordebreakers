@@ -335824,6 +335824,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 052aa6cbf1b887b4e81ade04c797d70e, type: 2}
   - {fileID: 11400000, guid: 2403fbd964fc4314d8e6b9bea2791fa7, type: 2}
   - {fileID: 11400000, guid: e4353288801f1d148985ba512ecc1dbf, type: 2}
+  - {fileID: 11400000, guid: e9e3679703dd90643b195ef49909d831, type: 2}
+  - {fileID: 11400000, guid: 168c7820cd8d81d47bf9df24cc5e71d9, type: 2}
+  - {fileID: 11400000, guid: 71fd38a4201636243a4a81e40f4e141a, type: 2}
+  - {fileID: 11400000, guid: 3b3c44255cc529e459b567bb59d2517f, type: 2}
+  - {fileID: 11400000, guid: 4768832ad8196bb41af3b60b53d65349, type: 2}
   player: {fileID: 0}
   rarityWeights: {fileID: 11400000, guid: a54a302c7f0a41c4ea9662b769132c19, type: 2}
 --- !u!4 &564664562
