@@ -14,20 +14,30 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.PlayerCombatData
   maxHp: 100
   moveSpeed: 5
-  dodgeSpeed: 16
+  dodgeSpeed: 6
   dodgeDuration: 0.25
   dodgeIFrames: 0.2
-  dodgeCooldown: 1
+  dodgeCooldown: 3
+  dodgeMaxCharges: 3
+  blockMitigation: 0.7
+  blockMoveSpeedMult: 0.4
+  blockFrontDot: 0.25
+  guardBreakDamageMult: 1
+  guardBreakStagger: 0.5
+  guardBreakResist: 0
+  heavyHyperarmor: 0
+  maxMusou: 100
+  musouGainDealtPerDamage: 0.9
+  musouGainTakenPerDamage: 1
+  musouRadius: 6
+  musouDamage: 60
+  musouDuration: 1.2
   lightDamage: 8
   lightReach: 2.2
-  lightDuration: 0.22
-  comboHits: 3
-  comboWindow: 0.6
   heavyDamage: 30
   heavyReach: 2.6
-  heavyWindup: 0.32
-  heavyRecovery: 0.2
-  detonationRadius: 4
-  detonationDamagePerStack: 6
-  detonationFlatDamage: 5
-  softTargetRange: 5
+  comboChainOpen: 0.75
+  minSwingInterval: 0.25
+  attackSteerSpeed: 1.5
+  dodgeCancelPhase: 0.55
+  attackSpeedMult: 1

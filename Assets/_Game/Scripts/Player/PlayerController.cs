@@ -157,8 +157,15 @@ namespace Hordebreakers
         public bool MusouReady => data != null && _musou >= data.maxMusou;
         /// <summary>True while a melee combo swing OR the bolt cast is playing (both Attack-tagged) — lets FootstepAudio duck steps so they don't crowd combat.</summary>
         public bool IsAttacking => InComboAttack();
-        /// <summary>True during a dodge roll — FootstepAudio kills steps here (the roll has its own whoosh instead).</summary>
-        public bool IsDodging => _dodgeTimer > 0f;
+        /// <summary>True for the whole dodge roll (dash window + the longer roll anim) — FootstepAudio kills steps here (the roll moves the whole time + has its own whoosh).</summary>
+        public bool IsDodging => _dodgeTimer > 0f || IsBaseInDodge();
+        /// <summary>Dodge charges currently banked (spent per roll, refill over dodgeCooldown). For the HUD charge readout.</summary>
+        public int DodgeCharges => _dodgeCharges;
+        /// <summary>Max dodge charges (the bank size; Augment-raised via DodgeMaxCharges).</summary>
+        public int DodgeMaxCharges => data != null ? Mathf.Max(1, data.dodgeMaxCharges) : 1;
+        /// <summary>0..1 fill of the NEXT recharging charge (1 when the bank is full). For the HUD's recharging-pip progress.</summary>
+        public float DodgeRechargeProgress => (data == null || _dodgeCharges >= Mathf.Max(1, data.dodgeMaxCharges) || data.dodgeCooldown <= 0f)
+            ? 1f : 1f - Mathf.Clamp01(_dodgeCdTimer / data.dodgeCooldown);
         /// <summary>Facing the player rotates toward — used by the throw weapon to aim.</summary>
         public Transform ModelRoot => modelRoot;
         /// <summary>The player's run-scoped build (taken augments, weapons, abilities). Wrapped by the augment context.</summary>
@@ -316,15 +323,21 @@ namespace Hordebreakers
                 MoveWithVertical(momentum + moveDir * data.attackSteerSpeed, dt);
                 SetAnimSpeed(0f, dt);
             }
+            else if (IsBaseInDodge())
+            {
+                // Roll tail (the roll anim outlasts the dash window): keep traversing EVENLY in the committed dodge
+                // direction — same _dodgeDir * dodgeSpeed as the dash — so the WHOLE roll moves at one constant rate
+                // instead of front-loading the dive and going stationary. No steering/facing (committed); action input
+                // was already processed above, so you can still cancel out of the roll.
+                MoveWithVertical(_dodgeDir * data.dodgeSpeed, dt);
+                SetAnimSpeed(0f, dt);
+            }
             else if (_blocking)
             {
                 _comboStep = 0;
                 float bctrl = data.blockMoveSpeedMult;                             // blocking slows you — not a free turtle
                 MoveWithVertical(moveDir * data.moveSpeed * bctrl, dt);
-                if (!IsBaseInDodge())                                              // don't re-orient until the roll anim finishes
-                {
-                    if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
-                }
+                if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
                 SetAnimSpeed(moveDir.magnitude * bctrl, dt);
             }
             else
@@ -332,13 +345,7 @@ namespace Hordebreakers
                 _comboStep = 0;                                                    // back to locomotion: combo resets
                 float ctrl = _grounded ? 1f : airControl;
                 MoveWithVertical(moveDir * data.moveSpeed * ctrl, dt);
-                // The dodge MOVEMENT window (_dodgeTimer) is shorter than the roll ANIMATION, so the tail lands here.
-                // Hold the roll's facing through it — otherwise, when locked, the model snaps toward the target ~2/3 of
-                // the way through the roll. Re-facing resumes once the dodge animation is actually done.
-                if (!IsBaseInDodge())
-                {
-                    if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
-                }
+                if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
                 SetAnimSpeed(moveDir.magnitude, dt);
             }
 
