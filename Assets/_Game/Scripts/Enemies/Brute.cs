@@ -174,7 +174,7 @@ namespace Hordebreakers
                 if (_player != null && _playerDmg != null && _playerDmg.IsAlive)
                 {
                     Vector3 d = _player.position - _slamPoint; d.y = 0f;
-                    if (d.magnitude <= data.slamRadius) _playerDmg.TakeDamage(data.slamDamage, transform.position);
+                    if (d.magnitude <= data.slamRadius) _playerDmg.TakeDamage(data.slamDamage, transform.position, data.guardBreaks);
                 }
                 PlayerCameraRig.Shake(slamShake.x, slamShake.y);
             }
@@ -215,6 +215,9 @@ namespace Hordebreakers
         }
 
         public void TakeDamage(float amount) => TakeDamage(amount, _player != null ? _player.position : transform.position - transform.forward);
+
+        // The brute doesn't block — guardBreak is irrelevant, so delegate to the 2-arg path.
+        public void TakeDamage(float amount, Vector3 sourcePos, bool guardBreak) => TakeDamage(amount, sourcePos);
 
         public void TakeDamage(float amount, Vector3 sourcePos)
         {

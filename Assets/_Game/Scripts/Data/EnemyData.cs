@@ -26,6 +26,9 @@ namespace Hordebreakers
         [Tooltip("Hard minimum distance the body keeps from the player's center — prevents standing inside the player. Keep just under (player CC radius + this body's radius) so it doesn't fight the player's own collision.")]
         public float playerSpacing = 0.6f;
 
+        [Tooltip("This enemy's committed strike (lunge/charge) shatters a held block (guard-break), staggering a turtling player. Chaff lunges leave this off; pressure units (Charger) turn it on.")]
+        public bool guardBreaks = false;
+
         [Header("Contact damage (strike)")]
         public float contactDamage = 5f;
         public float contactInterval = 1f;

@@ -17,6 +17,7 @@ MonoBehaviour:
   moveSpeed: 3
   separationRadius: 0.7
   separationForce: 6
+  guardBreaks: 0
   contactDamage: 5
   contactInterval: 1
   contactRange: 1.4

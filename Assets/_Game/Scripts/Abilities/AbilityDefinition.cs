@@ -16,8 +16,6 @@ namespace Hordebreakers
         [TextArea] public string description = "";
         [Tooltip("Seconds before it can be cast again.")]
         public float cooldown = 6f;
-        [Tooltip("Stamina spent to cast.")]
-        public float staminaCost = 25f;
         [SerializeReference] public List<AbilityEffect> effects = new List<AbilityEffect>();
 
         [Header("Audio")]

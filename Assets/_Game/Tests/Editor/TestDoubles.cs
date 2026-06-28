@@ -14,13 +14,16 @@ namespace Hordebreakers.Tests
         public Vector3 LastSource;
 
         public bool IsAlive => Alive;
-        public void TakeDamage(float amount) => TakeDamage(amount, Vector3.zero);
-        public void TakeDamage(float amount, Vector3 sourcePos)
+        public bool LastGuardBreak;
+        public void TakeDamage(float amount) => TakeDamage(amount, Vector3.zero, false);
+        public void TakeDamage(float amount, Vector3 sourcePos) => TakeDamage(amount, sourcePos, false);
+        public void TakeDamage(float amount, Vector3 sourcePos, bool guardBreak)
         {
             HitCount++;
             TotalDamage += amount;
             LastDamage = amount;
             LastSource = sourcePos;
+            LastGuardBreak = guardBreak;
         }
     }
 

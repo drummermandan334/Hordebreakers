@@ -12,8 +12,6 @@ namespace Hordebreakers
     {
         [SerializeField] private PlayerController player;
         [SerializeField] private Slider healthSlider;
-        [Tooltip("Stamina bar. Optional — assign a Slider to show it.")]
-        [SerializeField] private Slider staminaSlider;
         [Tooltip("Musou meter bar. Optional — assign a Slider to show it.")]
         [SerializeField] private Slider musouSlider;
         [SerializeField] private Slider xpSlider;
@@ -37,7 +35,6 @@ namespace Hordebreakers
         private void Update()
         {
             if (player != null && healthSlider != null) healthSlider.value = player.HealthNormalized;
-            if (player != null && staminaSlider != null) staminaSlider.value = player.StaminaNormalized;
             if (player != null && musouSlider != null) musouSlider.value = player.MusouNormalized;
 
             GameManager gm = GameManager.Instance;

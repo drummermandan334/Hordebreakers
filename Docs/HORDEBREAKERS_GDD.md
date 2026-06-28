@@ -1,7 +1,7 @@
 # HORDEBREAKERS — Game Design Document
 
 > **Working title `[TBD]`.** Title and the human kingdom's name are intentionally deferred to the vertical slice.
-> **Version:** 0.3 · See [Changelog](#changelog).
+> **Version:** 0.4 · See [Changelog](#changelog).
 > **One-line pitch:** A 1–4 player online co-op action game where an enslaved human warrior fights to retake a fallen kingdom, stronghold by stronghold — deliberate, weighty crowd combat whose godlike power is *earned* through a run-defining Augment draft.
 > **Fun hypothesis (still the thing that must feel good):** A fight you have to *read* — dodging and blocking under real pressure when you're under-equipped — that slides toward exhilarating crowd-clearing power as your Augments compound. Discipline early, abandon earned late. If the early, under-equipped fight isn't satisfying on its own, tune that first.
 
@@ -13,7 +13,7 @@ This is an **action-RPG** built on a **Souls-deliberate** combat floor, at **act
 
 Four pillars. If a feature serves none, cut it.
 
-1. **Deliberate combat that earns its power fantasy.** Every fight demands reading and answering enemies — dodge, block, spacing, stamina. The godlike crowd-clearing feeling is *earned* through the run, not the default state: hardest when you're under-equipped early, looser as your build compounds.
+1. **Deliberate combat that earns its power fantasy.** Every fight demands reading and answering enemies — dodge, block, spacing, and committing to your attacks. The godlike crowd-clearing feeling is *earned* through the run, not the default state: hardest when you're under-equipped early, looser as your build compounds.
 2. **Every run, a different build.** The Augment draft reshapes *how you fight* each run, and its randomness deliberately swings difficulty — a lucky synergy spread feels god-tier, an unlucky one forces clean, disciplined play. Skill is the floor that keeps a low roll winnable. Short runs, roguelite replay.
 3. **Better together.** Drop-in 1–4 online co-op with interlocking roles — a 4-stack is a coordinated war-band, not four soloists in a room.
 4. **A kingdom worth retaking.** Each stronghold is a distinct occupying faction with its own roster, mechanics, and art; a serious reconquest carries a light, absurdist thread underneath. Synty's readable low-poly keeps the crowds legible and the frame budget healthy.
@@ -69,7 +69,7 @@ The core problem v0.2 solves: the prototype felt like *3D Vampire Survivors with
 ### 4.1 Design tension & its resolution
 Souls-deliberate and the action-RPG power fantasy pull in opposite directions. They're reconciled by **putting the power curve in the build, not the baseline:**
 - The **baseline character stays deliberate all game** — committal attacks, real recovery, punishable mistakes, mandatory defense.
-- **Augments bend it toward abandon.** "Wave a huge sword through the crowd with impunity" is a *build outcome* (poise/hyperarmor, lifesteal, crowd-clear, stamina refunds), not the starting state.
+- **Augments bend it toward abandon.** "Wave a huge sword through the crowd with impunity" is a *build outcome* (poise/hyperarmor, guard-break resist, faster attacks, extra dodges, shorter dodge cooldown, lifesteal, crowd-clear), not the starting state. The Augments visibly **loosen the combat gates**, not just pad a stat sheet.
 - Therefore difficulty is **front-loaded**: under-equipped early = combat at its most disciplined; as Augments compound, you slide toward the power fantasy. The curve emerges from progression, not a difficulty slider.
 
 What stops button-mashing is the **enemies**, not a restrictive moveset: even chaff can hurt and *interrupt* you, elites and commanders demand real defensive reads, so you cannot ignore the crowd and swing through it. The power-fantasy *feeling* comes from clearing a crowd you've **earned the tools** to clear — never from enemies being harmless. (Action-RPG scale: dozens at most, never hundreds.)
@@ -77,25 +77,29 @@ What stops button-mashing is the **enemies**, not a restrictive moveset: even ch
 ### 4.2 Moveset
 | Action | Role | Notes |
 |---|---|---|
-| **Light attack** | Fast combo string | Crowd-engagement, lower commitment; chains into heavy |
-| **Heavy attack** | Committal crowd-clear / launcher | Big, weighty swings with knockback/launch and real recovery; costs a stamina chunk |
-| **Dodge** | Defensive reposition | I-frames; **stamina-gated** |
-| **Block** | Mitigation under pressure | Chips + costs stamina; not a free turtle answer |
-| **Musou meter** | Earned release valve | Builds from dealing/taking hits; unleashes a **screen-clearing finisher with i-frames** |
+| **Light attack** | Fast combo string | Crowd-engagement, lower commitment; chains into heavy. Committed through startup/active — only dodge-cancelable in recovery |
+| **Heavy attack** | Committal crowd-clear / launcher | Big, weighty swings with knockback/launch and **real recovery you commit to** — the weight is the swing's commitment, not a resource cost |
+| **Dodge** | Defensive reposition | I-frames; **cooldown/charge-gated** (a refilling charge bank, default 1 — Augments add charges / cut the cooldown) |
+| **Block** | Mitigation under pressure | Frontal chip-mitigation; **guard-breakable** — heavy/elite attacks shatter a held guard and stagger you, so turtling isn't a free answer |
+| **Musou meter** | Earned release valve | Builds from dealing/taking hits (**aggression speeds the charge**); unleashes a **screen-clearing finisher with i-frames** |
 | **Secondary / thrown** | Manual ranged option | A player-triggered throw (not auto-fire); a tunable target for Augments |
 | **Abilities** | Dynasty-Warriors-style specials | The **Grand Ability System (GAS)** — see §6/§11; granted/upgraded via Augments, built server-authoritative for co-op from the start |
 
 Movement is camera-relative. Facing follows your movement/aim; on a swing, a subtle, tunable facing assist rotates you a few degrees toward the nearest enemy in a narrow aim cone so attacks connect in a crowd — never a lock-on or positional pull, and tunable to zero for fully manual facing. Controller-first.
 
-### 4.3 Stamina — a rhythm, not a noose
-Stamina shapes *how* you fight (pace aggression, time defense, don't spam) without an empty bar being how you lose the run. **Pressure, not punishment.** This is the load-bearing distinction from Souls — it is deliberately *less harsh and unforgiving*. Levers:
-- **Movement is free.** Only attacks, dodge, and block cost stamina — walking/repositioning never does, so you can always reposition to breathe.
-- **Fast regen, short delay.** The bar returns quickly once you stop spending; being empty is a brief "reset and breathe" beat, `[PLACEHOLDER: regen rate, regen delay ~0.5s]`.
-- **Empty ≠ defenseless** (the key softener). Running dry doesn't lock out defense: you keep a weaker "stumble" dodge and block still *partially* mitigates rather than failing open. You're worse off empty, never helpless.
-- **Generous i-frames + input buffer.** Forgiving dodge windows and buffered inputs — Souls discipline without twitch-perfect timing. `[PLACEHOLDER: dodge i-frames, buffer window]`.
-- **Big swings are decisions, not bankruptcies.** Heavy/launcher attacks cost a chunk and have recovery — weighty to spend into — but never the thing that drops you to a death.
+### 4.3 The deliberate floor — commitment & re-gated defense (no stamina bar)
+There is **no stamina bar.** A depleting resource is a duel mechanic; in a crowd game it didn't meaningfully gate the player, wasn't fun, and tied the "deliberate" feeling to a number ticking down. Instead the friction is **structural** — it lives in the animations and the defensive cooldowns, where it reads directly off what's on screen. **Pressure, not punishment** still holds: this is deliberately *less harsh than Souls*, the discipline comes from commitment and timing, not a bar you can bankrupt yourself on.
 
-**Stamina is itself a primary Augment dial:** bigger pool, faster regen, "heavy attacks cost no stamina," "a clean dodge refunds stamina," hyperarmor to avoid stagger-lock. The same bar that enforces discipline when under-equipped is what you progressively *loosen* into the power fantasy — a real constraint early, nearly vanished on a strong late-run build.
+**Commitment & cancel windows (replaces the cost on attacks).**
+- A swing is **committed** through its startup and active frames and **cancelable only in recovery** — i.e. after the hit lands (`dodgeCancelPhase`, default ~0.55). You can't instantly dodge-cancel out of the frames you started; the weight of the swing *is* the commitment.
+- **Mashing is self-punishing.** A dodge pressed during a swing's committed frames **buffers** and fires the instant recovery opens (responsive), but it can't yank you out of the active frames — so spamming locks you into the string instead of escaping it. A hard wall-clock `minSwingInterval` also floors the swing rate so a burst of presses can't fire several swings (and whooshes) at once.
+- **Generous i-frames + input buffer.** Forgiving dodge windows and buffered inputs — Souls discipline without twitch-perfect timing. `[PLACEHOLDER: dodge i-frames, buffer window]`.
+
+**Re-gated defense (replaces the cost on dodge/block).**
+- **Dodge** is gated by a **refilling charge bank** (`dodgeMaxCharges`, default 1) that recharges over `dodgeCooldown`: each roll spends a charge, a charge refills on the cooldown. At one charge it's a single cooldown-gated roll; Augments add charges or shorten the cooldown.
+- **Block** gives frontal chip-mitigation but is **guard-breakable**: heavy and elite attacks (`guardBreaks`) shatter a held guard, landing full damage and staggering you. Turtling answers chaff but **fails against the attacks that demand a dodge** — so block is a tool, never a free panic button.
+
+**Poise is the Augment payoff that loosens those gates.** `GuardBreakResist` lets a held block hold even against guard-breaking attacks; `Hyperarmor` softens a guard-break from a rooted stagger into a mere flinch. Together with faster attacks, extra dodge charges, a shorter dodge cooldown, and reduced block chip, the same gates that enforce discipline when under-equipped are what you progressively *loosen* into the power fantasy — a real constraint early, nearly vanished on a strong late-run build.
 
 ### 4.4 Juice (Pillar #1)
 Weight reads through hitstop on heavies, knockback/launch and ragdolls on crowd clears, screen-shake scaled to impact, distinct Musou-release VFX, and audio that cuts through density. Reinforced via PrimeTween (unscaled-safe) + Cinemachine Impulse (see §11 juice pass). All telegraphs must read at the close behind-and-above camera angle — see §7.
@@ -185,7 +189,7 @@ A massive, multi-phase encounter that **completes a Level**. The race's champion
 ## 10. Onboarding (target: a new player completes the first stronghold unaided)
 
 - [ ] Core verb (move + light attack) usable within **30 seconds**.
-- [ ] **Defense taught early and as mandatory** — the first pressuring enemy forces a dodge/block; stamina introduced gently in a low-stakes beat.
+- [ ] **Defense taught early and as mandatory** — the first pressuring enemy forces a dodge/block; attack commitment and the dodge cooldown introduced gently in a low-stakes beat.
 - [ ] **First arena is survivable** — early discipline, not early death; the front-loaded difficulty is "demanding," not "punishing."
 - [ ] First **Augment draft** lands within the first arena clear — the player feels the build lever immediately.
 - [ ] First run/stronghold ends on a **hook** — a new Augment, a new class, or the first elven aside that makes the player go "...wait, what did he just say?"
@@ -198,7 +202,7 @@ A massive, multi-phase encounter that **completes a Level**. The race's champion
 **Co-op netcode** — syncing the enemy crowd across four clients. At action-RPG scale (dozens, not hundreds) this is far more tractable than a musou swarm, but still de-risk with a dedicated networking spike before scaling content.
 
 ### Build order (de-risk fun before scale)
-1. **Single-player core prototype** *(in progress)* — deliberate melee + stamina + dodge/block + Musou meter, on the Elden-Ring-adjacent action camera. Prove the §1 fun hypothesis: is the under-equipped fight satisfying on its own?
+1. **Single-player core prototype** *(in progress)* — deliberate melee (attack commitment) + cooldown/charge-gated dodge + guard-breakable block + Musou meter, on the Elden-Ring-adjacent action camera. Prove the §1 fun hypothesis: is the under-equipped fight satisfying on its own?
 2. **Augment system increments** *(in progress with Code)* — composable effect SOs, `PlayerLoadout`, class-gating, rarity weights, the four starter effects (incl. one working Evolution chain as proof). **Next increment:** the on-hit proc hook + `OnHitProcEffect`, landed isolated. Then update GDD §6 to the final shipped model.
 3. **Grand Ability System (Task A)** — 1–2 Dynasty-Warriors abilities alongside melee, damaging via `IDamageable`, server-authoritative, plugging into the Augment `GrantAbility` seam (no parallel path).
 4. **Vertical slice** — one stronghold (one race), its arena set (waves → mini-boss/objective) + a Boss, a real Augment pool, the level-up flow. **Name the kingdom + game title here.**
@@ -217,6 +221,7 @@ A massive, multi-phase encounter that **completes a Level**. The race's champion
 | Version | Date | Notes |
 |---|---|---|
 | 0.1 | initial | Foundation: pillars, core loop, mark/detonate hybrid combat + enemy taxonomy, hybrid waves+boss, starter roster, host+Steam multiplayer, tech, onboarding. |
+| 0.4 | 2026-06-28 | **Stamina removed.** The depleting bar (a duel mechanic that didn't gate a crowd game and wasn't fun) is gone from §1/§4. The deliberate floor is now **structural**: **attack commitment** (swings committed through startup/active, dodge-cancelable only in recovery via `dodgeCancelPhase`; mashing buffers into the string instead of escaping it) + **re-gated defense** (dodge gated by a refilling **charge bank** `dodgeMaxCharges`/`dodgeCooldown`; **block is guard-breakable** — heavy/elite `guardBreaks` attacks shatter a held guard and stagger you). Power curve moved to **Augment dials** that visibly loosen the gates: `AttackSpeed`, `DodgeCooldown`, `DodgeMaxCharges`, `DodgeCancelPhase`, `BlockMitigation`, `GuardBreakResist`, `Hyperarmor`, `MusouGainDealt/Taken`. Musou dealt-gain bumped so aggression accelerates the meter. §4.3 rewritten ("Stamina — a rhythm, not a noose" → "commitment & re-gated defense"); moveset/pillar/onboarding/build-order rows updated. Implemented in Code on `PlayerController`/`PlayerCombatData`/`StatModEffect`/`IDamageable`/`Enemy`/`Brute`. |
 | 0.3 | 2026-06-24 | **Action-RPG scale + camera reframe.** Confirmed **action-RPG scale — dozens on screen at most, never hundreds**; **musou framing removed** throughout (§1/§3/§4/§5/§7/§8). Camera retuned to **Elden-Ring-adjacent** values on the `CM_PlayerCam` Cinemachine rig + `PlayerCameraRig`: **FOV 50, distance 4.5, pitch 15°, orbit height 2.0, look-at offset 1.5, follow damping 0.12** (all tunable; intimate, not pulled back). §9: **DOTS/ECS reframed as likely unnecessary** at this scale — revisit only if pooled GameObjects can't hold 60 FPS; prototype stays pooled-MonoBehaviour, **no code removed**. The "Musou meter" *mechanic* name is kept (it's the screen-clear ultimate, distinct from the cut musou *framing*). |
 | 0.2.2 | 2026-06-24 | **Enemy telegraph legibility + a second archetype (in Code) & playtested.** New `AttackTelegraph` component: the whole enemy throb-glows (emissive MPB, crescendos toward the strike) during any wind-up — the asset-light, camera-angle-proof tell §5/§7 ask for; wired into the Husk lunge, the Charger, and the Brute slam (runs before `HitFlash` so a hit overrides it). New **Charger** archetype (Tier-2): data-driven on the existing `Enemy` via `EnemyData.archetype` (reuses the Husk prefab — no new art), rushes in and commits a long, very readable telegraphed dash that sweep-connects mid-charge with a big punish window if whiffed; spawns from the Husk pool (`WaveDirector.chargerData`, `firstChargerWave`/`chargerChance`). Open: ground-decal telegraphs still want a true height cue; more archetypes; an `EnemyBase` refactor (Enemy/Brute still duplicate). |
 | 0.2.1 | 2026-06-24 | **Combat floor implemented (in Code) & playtested.** §4.2 facing reworded to a subtle, tunable rotation-only aim assist (0 = manual). Built on `PlayerController`/`PlayerCombatData`: the **stamina** system (§4.3 — costs on attack/dodge, fast regen, *empty ≠ defenseless* stumble dodge, movement free); **block** (frontal-only, mitigation + chip + stamina cost, partial when empty); the **Musou meter** (builds from dealing/taking hits → i-frame screen-clear AoE); the **juice split** (hitstop on heavies only, lights snappy). Objective fixes: heavy hit/VFX contact sync, pooled Brute telegraph. HUD stamina + musou bars added. All values `[PLACEHOLDER]` — tune by feel. Still open: dodge cooldown vs stamina, enemy telegraph legibility, enemy variety, audio. |

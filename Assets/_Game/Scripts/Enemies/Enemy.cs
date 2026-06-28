@@ -236,7 +236,7 @@ namespace Hordebreakers
                 Vector3 toP = _player.position - transform.position; toP.y = 0f;
                 if (toP.magnitude <= _data.chargeHitRadius)
                 {
-                    _playerDmg.TakeDamage(_data.chargeDamage, transform.position);
+                    _playerDmg.TakeDamage(_data.chargeDamage, transform.position, _data.guardBreaks);
                     _state = State.Recover;
                     _stateTimer = _data.chargeRecovery;
                     return;
@@ -251,7 +251,7 @@ namespace Hordebreakers
                 {
                     Vector3 to = _player.position - transform.position; to.y = 0f;
                     if (to.magnitude <= _standoff * lungeConnectReachMult)
-                        _playerDmg.TakeDamage(_data.contactDamage, transform.position);
+                        _playerDmg.TakeDamage(_data.contactDamage, transform.position, _data.guardBreaks);
                 }
                 _state = State.Recover;
                 _stateTimer = charger ? _data.chargeRecovery : _data.attackRecovery;
@@ -343,6 +343,9 @@ namespace Hordebreakers
 
         // Damage from an unknown source recoils away from the player (the usual melee attacker).
         public void TakeDamage(float amount) => TakeDamage(amount, _player != null ? _player.position : transform.position - transform.forward);
+
+        // Enemies don't block — guardBreak is irrelevant, so delegate to the 2-arg path.
+        public void TakeDamage(float amount, Vector3 sourcePos, bool guardBreak) => TakeDamage(amount, sourcePos);
 
         public void TakeDamage(float amount, Vector3 sourcePos)
         {

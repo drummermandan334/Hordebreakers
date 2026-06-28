@@ -100,29 +100,30 @@ namespace Hordebreakers
         private PlayerVoice _voice;
         private PlayerLoadout _loadout;
         private float _hp;
-        private float _stamina;
-        private float _staminaRegenDelayTimer;   // > 0 while regen is held off after a spend
-        private bool _dodgeStumble;              // the current dodge was a too-tired 'stumble' (weaker)
         private bool _blocking;
         private float _musou;
         private bool _musouActive;
         private float _musouTimer;
-        private bool _hasBlockParam, _hasMusouParam;   // does the Animator define these (else skip to avoid warnings)
+        private bool _hasBlockParam, _hasMusouParam, _hasAttackSpeedParam;   // does the Animator define these (else skip to avoid warnings)
         private int _blockLayer = -1;                  // upper-body Block override layer; weight driven by _blocking
 
         // timers / state
         private float _dodgeTimer;         // > 0 while dashing
-        private float _dodgeCdTimer;
+        private float _dodgeCdTimer;       // > 0 while a dodge charge is recharging
+        private int _dodgeCharges;         // banked dodges (spent per roll, refill over dodgeCooldown); replaces the old stamina gate
+        private float _guardBreakTimer;    // > 0 while staggered by a guard-break (movement paused, like an enemy stagger)
         private float _hitReactCdTimer;    // > 0 while the player hit-react flinch is on cooldown
         private bool _invulnerable;
         private Vector3 _dodgeDir;
         private int _comboStep;            // 1..3 combo slot (advances while chaining, resets in locomotion)
         private int _bufferedAttack;       // 0 none / 1 light / 2 heavy — press queued mid-swing
+        private bool _bufferedDodge;       // a dodge pressed mid-swing (before the cancel window) — fires the instant recovery opens
         private Vector3 _attackVel;        // brief forward drive on a swing
         private float _attackStepTimer;    // > 0 while the forward step is applied
         private float _pendingReach, _pendingDamage;   // the armed swing's hit, resolved at its contact phase
         private bool _pendingHeavy, _pendingFinisher;
         private bool _swingHitResolved;    // true once the current swing has landed its hit (one hit per swing)
+        private float _nextSwingTime;      // earliest time the next swing can fire — a hard rate limit that holds across the inAttack=false gaps (after a combo / out of a dodge) where animator-state gating fails
         private int _lastAttackStateHash;  // fullPathHash of the swing's attack state — arms one hit per swing (input-independent)
         private bool _lockCycleArmed = true;   // re-armed when the right stick re-centers, so one flick = one target switch
         private bool _castSwing;               // the current swing is a magic-bolt cast (fires a projectile, not a melee hit)
@@ -138,6 +139,7 @@ namespace Hordebreakers
         private readonly float[] _abilityCooldowns = new float[MAX_ABILITY_SLOTS];   // per granted-ability cooldown timers
 
         private static readonly int AnimSpeed = Animator.StringToHash("Speed");
+        private static readonly int AnimAttackSpeed = Animator.StringToHash("AttackSpeed");
         private static readonly int AnimLight = Animator.StringToHash("Light");
         private static readonly int AnimHeavy = Animator.StringToHash("Heavy");
         private static readonly int AnimDodge = Animator.StringToHash("Dodge");
@@ -151,7 +153,6 @@ namespace Hordebreakers
 
         public bool IsAlive => _hp > 0f;
         public float HealthNormalized => data != null ? Mathf.Clamp01(_hp / data.maxHp) : 0f;
-        public float StaminaNormalized => data != null && data.maxStamina > 0f ? Mathf.Clamp01(_stamina / data.maxStamina) : 0f;
         public float MusouNormalized => data != null && data.maxMusou > 0f ? Mathf.Clamp01(_musou / data.maxMusou) : 0f;
         public bool MusouReady => data != null && _musou >= data.maxMusou;
         /// <summary>True while a melee combo swing OR the bolt cast is playing (both Attack-tagged) — lets FootstepAudio duck steps so they don't crowd combat.</summary>
@@ -171,7 +172,7 @@ namespace Hordebreakers
             if (hitFlash == null) hitFlash = GetComponentInChildren<HitFlash>();
             _throw = GetComponentInChildren<ThrowWeapon>();
             _voice = GetComponent<PlayerVoice>();
-            if (animator != null) { _gripLayer = animator.GetLayerIndex("RightHandGrip"); _armLayer = animator.GetLayerIndex("SwordArm"); _blockLayer = animator.GetLayerIndex("Block"); _hasBlockParam = HasParam("Block"); _hasMusouParam = HasParam("Musou"); }
+            if (animator != null) { _gripLayer = animator.GetLayerIndex("RightHandGrip"); _armLayer = animator.GetLayerIndex("SwordArm"); _blockLayer = animator.GetLayerIndex("Block"); _hasBlockParam = HasParam("Block"); _hasMusouParam = HasParam("Musou"); _hasAttackSpeedParam = HasParam("AttackSpeed"); }
             if (animator != null && animator.isHuman) _leftHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
             if (data == null)
             {
@@ -182,7 +183,7 @@ namespace Hordebreakers
             data = Instantiate(data);                 // runtime copy so upgrades don't dirty the source asset
             _camT = UnityEngine.Camera.main != null ? UnityEngine.Camera.main.transform : null;
             _hp = data.maxHp;
-            _stamina = data.maxStamina;
+            _dodgeCharges = Mathf.Max(1, data.dodgeMaxCharges);
             _loadout = new PlayerLoadout(characterClass, _throw);   // run-scoped build model
             for (int i = 0; i < startingAbilities.Count; i++) _loadout.GrantAbility(startingAbilities[i]);   // sorcerer's base spell kit
         }
@@ -194,6 +195,13 @@ namespace Hordebreakers
             AugmentContext ctx = new AugmentContext(this, data, _loadout);
             augment.Apply(in ctx);
             _loadout.Record(augment);
+        }
+
+        /// <summary>Top the dodge-charge bank up to the current max — called when an Augment raises dodgeMaxCharges so the extra roll is usable at once.</summary>
+        public void RefillDodgeCharges()
+        {
+            _dodgeCharges = Mathf.Max(_dodgeCharges, Mathf.Max(1, data.dodgeMaxCharges));
+            _dodgeCdTimer = 0f;
         }
 
         /// <summary>Restore health, capped at current max. Used by level-up upgrade effects.</summary>
@@ -208,6 +216,7 @@ namespace Hordebreakers
             float dt = Time.deltaTime;
             TickTimers(dt);
             UpdateGripLayer(dt);
+            if (_hasAttackSpeedParam) animator.SetFloat(AnimAttackSpeed, data.attackSpeedMult);   // Augment AttackSpeed dial drives the swing clips' playback (skipped until the param is wired on the controller)
 
             // Musou finisher owns the player completely (rooted, i-frames) while active.
             if (_musouActive) { TickMusou(dt); return; }
@@ -216,8 +225,15 @@ namespace Hordebreakers
             if (_dodgeTimer > 0f)
             {
                 SetAnimSpeed(0f, dt);
-                float dodgeSpeed = data.dodgeSpeed * (_dodgeStumble ? data.stumbleDodgeSpeedMult : 1f);
-                MoveWithVertical(_dodgeDir * dodgeSpeed, dt);
+                MoveWithVertical(_dodgeDir * data.dodgeSpeed, dt);
+                return;
+            }
+
+            // Guard-broken: staggered for a beat (rooted), same shape as the musou/dodge takeovers.
+            if (_guardBreakTimer > 0f)
+            {
+                SetAnimSpeed(0f, dt);
+                MoveWithVertical(Vector3.zero, dt);
                 return;
             }
 
@@ -235,8 +251,20 @@ namespace Hordebreakers
             Vector3 moveDir = locked ? LockedMoveDir(lockDir) : ReadMoveDir();
 
             bool inAttack = InComboAttack();                                       // base layer is playing an attack clip
-            // Chain only once the current swing has played comboChainOpen of its clip, so each swing animates fully.
-            bool canAct = !inAttack || (_grounded && AttackPhase() >= data.comboChainOpen);
+            // Chain only once the swing has played comboChainOpen of its clip (earlier presses buffer), AND no sooner
+            // than minSwingInterval since the last swing. The time floor is the real guard against mashing: in the gaps
+            // between swings / after a combo / out of a dodge the swing has ended, so inAttack is false and the phase
+            // gate opens every frame — only the time limit stops a per-frame burst of swings + whooshes there.
+            bool canAct = (!inAttack || (_grounded && AttackPhase() >= data.comboChainOpen)) && Time.time >= _nextSwingTime;
+
+            // A buffered dodge (pressed mid-swing, before the cancel window) fires the instant recovery opens — a
+            // swing is committed through startup/active and only dodge-cancelable once it reaches dodgeCancelPhase.
+            bool canDodgeCancel = !inAttack || AttackPhase() >= data.dodgeCancelPhase;
+            if (_bufferedDodge && canDodgeCancel)
+            {
+                if (_dodgeCharges > 0) { _bufferedDodge = false; _bufferedAttack = 0; StartDodge(ReadMoveDir()); return; }
+                if (!inAttack) _bufferedDodge = false;   // recovery opened but no charge and we're free again — drop the queued intent
+            }
 
             bool firedBuffered = false;
             if (_bufferedAttack != 0 && canAct) { int b = _bufferedAttack; _bufferedAttack = 0; AttackInput(b == 2); firedBuffered = true; }
@@ -258,7 +286,19 @@ namespace Hordebreakers
             // in the PREVIOUS swing at a late phase, so it resolved instantly on the button press with the hitbox in the
             // wrong place (the early/inconsistent hits). Mirrors WeaponVfx's per-swing detection.
             int atkHash = CurrentAttackStateHash();
-            if (atkHash != _lastAttackStateHash) { _lastAttackStateHash = atkHash; if (atkHash != 0) _swingHitResolved = false; }
+            if (atkHash != _lastAttackStateHash)
+            {
+                _lastAttackStateHash = atkHash;
+                if (atkHash != 0)
+                {
+                    _swingHitResolved = false;
+                    // Whoosh fires HERE — the instant a real swing animation begins — NOT on the input press. Definitive
+                    // fix for the mash / "phantom attack" multi-whoosh: a press that doesn't actually start a new swing
+                    // (a gap after a combo, coming out of a dodge, no valid transition) can no longer make a sound. Skip
+                    // the dodge roll (its own whoosh) and the bolt cast (its own fireball SFX) — both are Attack-tagged.
+                    if (!IsBaseInDodge() && !_castSwing) CombatAudio.PlaySwing(transform.position, _pendingHeavy);
+                }
+            }
 
             if (inAttack)
             {
@@ -281,7 +321,10 @@ namespace Hordebreakers
                 _comboStep = 0;
                 float bctrl = data.blockMoveSpeedMult;                             // blocking slows you — not a free turtle
                 MoveWithVertical(moveDir * data.moveSpeed * bctrl, dt);
-                if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
+                if (!IsBaseInDodge())                                              // don't re-orient until the roll anim finishes
+                {
+                    if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
+                }
                 SetAnimSpeed(moveDir.magnitude * bctrl, dt);
             }
             else
@@ -289,7 +332,13 @@ namespace Hordebreakers
                 _comboStep = 0;                                                    // back to locomotion: combo resets
                 float ctrl = _grounded ? 1f : airControl;
                 MoveWithVertical(moveDir * data.moveSpeed * ctrl, dt);
-                if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
+                // The dodge MOVEMENT window (_dodgeTimer) is shorter than the roll ANIMATION, so the tail lands here.
+                // Hold the roll's facing through it — otherwise, when locked, the model snaps toward the target ~2/3 of
+                // the way through the roll. Re-facing resumes once the dodge animation is actually done.
+                if (!IsBaseInDodge())
+                {
+                    if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
+                }
                 SetAnimSpeed(moveDir.magnitude, dt);
             }
 
@@ -300,26 +349,24 @@ namespace Hordebreakers
         private void TickTimers(float dt)
         {
             if (_attackStepTimer > 0f) _attackStepTimer -= dt;
-            if (_dodgeCdTimer > 0f) _dodgeCdTimer -= dt;
             if (_hitReactCdTimer > 0f) _hitReactCdTimer -= dt;
+            if (_guardBreakTimer > 0f) _guardBreakTimer -= dt;
             if (_dodgeTimer > 0f) _dodgeTimer -= dt;
             for (int i = 0; i < _abilityCooldowns.Length; i++) { if (_abilityCooldowns[i] > 0f) _abilityCooldowns[i] -= dt; }
             if (_castCdTimer > 0f) _castCdTimer -= dt;
-            float iFrames = data.dodgeIFrames * (_dodgeStumble ? data.stumbleDodgeIFrameMult : 1f);
-            _invulnerable = _dodgeTimer > 0f && _dodgeTimer > (data.dodgeDuration - iFrames);
+            _invulnerable = _dodgeTimer > 0f && _dodgeTimer > (data.dodgeDuration - data.dodgeIFrames);
 
-            // Stamina regen: kicks in after a short delay once you stop spending (movement never costs stamina).
-            if (_staminaRegenDelayTimer > 0f) _staminaRegenDelayTimer -= dt;
-            else if (_stamina < data.maxStamina) _stamina = Mathf.Min(data.maxStamina, _stamina + data.staminaRegen * dt);
-        }
-
-        /// <summary>Spend stamina if affordable; returns false (no spend) when too tired. Resets the regen delay on a spend.</summary>
-        private bool SpendStamina(float cost)
-        {
-            if (_stamina < cost) return false;
-            _stamina -= cost;
-            _staminaRegenDelayTimer = data.staminaRegenDelay;
-            return true;
+            // Dodge charges: refill one per dodgeCooldown while below max (the dodge gate now that stamina is gone).
+            int maxCharges = Mathf.Max(1, data.dodgeMaxCharges);
+            if (_dodgeCharges < maxCharges)
+            {
+                _dodgeCdTimer -= dt;
+                if (_dodgeCdTimer <= 0f)
+                {
+                    _dodgeCharges++;
+                    _dodgeCdTimer = _dodgeCharges < maxCharges ? data.dodgeCooldown : 0f;   // keep refilling toward max
+                }
+            }
         }
 
         // ---------- Grand abilities (Task A) ----------
@@ -339,8 +386,8 @@ namespace Hordebreakers
         }
 
         /// <summary>
-        /// Authoritative ability activation (the single entry point a host can drive for co-op): validates slot,
-        /// cooldown, and stamina, then casts. Returns true if it fired.
+        /// Authoritative ability activation (the single entry point a host can drive for co-op): validates slot
+        /// and cooldown, then casts. Returns true if it fired.
         /// </summary>
         public bool TryActivateAbility(int slot)
         {
@@ -349,7 +396,6 @@ namespace Hordebreakers
             if (slot >= abilities.Count) return false;
             AbilityDefinition ability = abilities[slot];
             if (ability == null || _abilityCooldowns[slot] > 0f) return false;
-            if (!SpendStamina(ability.staminaCost)) return false;
             ability.Activate(this);
             _abilityCooldowns[slot] = ability.cooldown;
             return true;
@@ -482,7 +528,17 @@ namespace Hordebreakers
             bool heavy = Input.GetMouseButtonDown(1)         || (pad != null && (pad.buttonNorth.wasPressedThisFrame || pad.rightTrigger.wasPressedThisFrame));
             bool cast  = Input.GetKeyDown(KeyCode.Q)         || (pad != null && pad.rightShoulder.wasPressedThisFrame);   // magical bolt (Q / RB)
 
-            if (dodge && _dodgeCdTimer <= 0f) { _bufferedAttack = 0; StartDodge(moveDir); return; }   // dodge cancels a swing
+            // Dodge uses FREE camera-relative input even when locked on, so you can roll any direction to disengage
+            // (target-relative strafe made an "away" roll curve back toward the enemy). The lock itself stays — you
+            // re-face the target after the roll. A swing is committed through startup/active: a dodge only cancels it
+            // once it reaches dodgeCancelPhase (recovery). Pressed earlier, it BUFFERS and fires when the window opens.
+            if (dodge)
+            {
+                bool canDodgeCancel = !inAttack || AttackPhase() >= data.dodgeCancelPhase;
+                if (canDodgeCancel && _dodgeCharges > 0) { _bufferedAttack = 0; StartDodge(ReadMoveDir()); return; }
+                else if (inAttack) _bufferedDodge = true;   // committed in the active frames — queue; fires the instant recovery opens
+                // (pressed while free but simply out of charges: dropped, never queued — no phantom dodge a second later)
+            }
             if (jump && _grounded && !inAttack) DoJump();                     // no jump-canceling a swing
 
             if (light || heavy)
@@ -574,6 +630,14 @@ namespace Hordebreakers
             return animator.IsInTransition(0) && animator.GetNextAnimatorStateInfo(0).IsTag("Attack");
         }
 
+        /// <summary>True while the base layer is in (or transitioning into) the Dodge roll state — used to hold facing through the whole roll animation.</summary>
+        private bool IsBaseInDodge()
+        {
+            if (animator == null) return false;
+            if (animator.IsInTransition(0)) return animator.GetNextAnimatorStateInfo(0).IsName("Dodge");
+            return animator.GetCurrentAnimatorStateInfo(0).IsName("Dodge");
+        }
+
         /// <summary>Like IsBaseInAttack but excludes the dodge roll (which has its own movement handling).</summary>
         private bool InComboAttack()
         {
@@ -619,12 +683,13 @@ namespace Hordebreakers
         private void StartDodge(Vector3 moveDir)
         {
             _attackStepTimer = 0f; _attackVel = Vector3.zero;
-            // Empty != defenseless: too tired to pay full cost still gets a weaker 'stumble' dodge, never a lockout.
-            _dodgeStumble = !SpendStamina(data.dodgeStaminaCost);
-            if (_dodgeStumble) _staminaRegenDelayTimer = data.staminaRegenDelay;
+            _bufferedDodge = false;
+            // Spend a charge; start the recharge if we just left a full bank (the charge gate replaces stamina).
+            int maxCharges = Mathf.Max(1, data.dodgeMaxCharges);
+            if (_dodgeCharges >= maxCharges) _dodgeCdTimer = data.dodgeCooldown;
+            _dodgeCharges = Mathf.Max(0, _dodgeCharges - 1);
             _dodgeDir = moveDir.sqrMagnitude > 0.01f ? moveDir.normalized : modelRoot.forward;
             _dodgeTimer = data.dodgeDuration;
-            _dodgeCdTimer = data.dodgeCooldown;
             modelRoot.rotation = Quaternion.LookRotation(_dodgeDir);
             CombatAudio.PlayDodge(transform.position);   // roll whoosh (its own clip set on CombatAudio — not a footstep)
             if (animator != null) animator.SetTrigger(AnimDodge);
@@ -635,11 +700,10 @@ namespace Hordebreakers
         // trigger; the AnimatorController routes slot+input to the right clip. The 3rd hit is the lunge.
         private void AttackInput(bool heavy)
         {
-            float cost = heavy ? data.heavyStaminaCost : data.lightStaminaCost;
-            if (!SpendStamina(cost)) return;   // too tired to swing — movement is free, so reposition while stamina regens
+            _nextSwingTime = Time.time + data.minSwingInterval;   // rate-limit floor across the inAttack=false gaps
 
             _castSwing = false;   // a melee swing clears any pending cast
-            CombatAudio.PlaySwing(transform.position, heavy);   // swing whoosh (clips live on CombatAudio; heavier set for heavies)
+            // (the swing whoosh is fired from the animator state-change, not here — so it can't sound without a real swing)
             _comboStep = (InComboAttack() && _comboStep < 3) ? _comboStep + 1 : 1;   // chaining advances the slot; a fresh attack resets it
             AimFace();
             if (animator != null) animator.SetTrigger(heavy ? AnimHeavy : AnimLight);
@@ -763,30 +827,57 @@ namespace Hordebreakers
         }
 
         // ---------- IDamageable ----------
-        public void TakeDamage(float amount) => TakeDamage(amount, transform.position + modelRoot.forward);
+        public void TakeDamage(float amount) => TakeDamage(amount, transform.position + modelRoot.forward, false);
+        public void TakeDamage(float amount, Vector3 sourcePos) => TakeDamage(amount, sourcePos, false);
 
-        public void TakeDamage(float amount, Vector3 sourcePos)
+        /// <summary>
+        /// Take a hit. <paramref name="guardBreak"/> (heavy/elite attacks) shatters a held frontal block — the block
+        /// fails open and staggers you — unless the GuardBreakResist poise dial is up. The 2-arg overloads pass
+        /// guardBreak:false; enemies that don't guard-break pass false too.
+        /// </summary>
+        public void TakeDamage(float amount, Vector3 sourcePos, bool guardBreak)
         {
             if (invincible || _invulnerable || _musouActive || _hp <= 0f) return;   // dodge i-frames AND the musou finisher fully negate
 
-            // Block: a frontal hit is mitigated (chips through) at a stamina cost; mitigates partially even when empty.
+            // Block: a frontal hit is mitigated (chips through). A guard-breaking attack shatters it (unless poise resists):
+            // the block fails, damage lands at guardBreakDamageMult, and you're staggered.
             bool blocked = false;
+            bool guardBroken = false;
             if (_blocking && IsFrontalHit(sourcePos))
             {
-                float mit = _stamina >= data.blockStaminaPerHit ? data.blockMitigation : data.emptyBlockMitigation;
-                SpendStamina(data.blockStaminaPerHit);
-                amount *= (1f - mit);
-                blocked = true;
+                if (guardBreak && data.guardBreakResist <= 0f)
+                {
+                    amount *= data.guardBreakDamageMult;
+                    guardBroken = true;
+                }
+                else
+                {
+                    amount *= (1f - data.blockMitigation);
+                    blocked = true;
+                }
             }
 
             _hp -= amount;
             GainMusou(amount * data.musouGainTakenPerDamage);
             if (!blocked && hitFlash != null) hitFlash.Flash();   // a clean block isn't a hurt — skip the red flash
-            float shakeMul = blocked ? 0.5f : 1f;
+            float shakeMul = blocked ? 0.5f : (guardBroken ? 1.4f : 1f);   // guard-break reads with a bigger jolt
             PlayerCameraRig.Shake(damageShake.x * shakeMul, damageShake.y * shakeMul);
             if (GameManager.Instance != null) GameManager.Instance.HitStop(damageHitStop.x, damageHitStop.y);
+            if (guardBroken) CombatAudio.PlayHit(transform.position);   // guard-break cue (heavy thunk through the guard)
             if (_hp <= 0f) { Die(); return; }
             if (!blocked && _voice != null) _voice.Hurt(amount);   // a clean block isn't a hurt — no hurt grunt
+
+            // A guard-break ALWAYS staggers (forced flinch + rooted beat), bypassing the usual mid-action poise — that's the
+            // whole point of breaking the guard. Hyperarmor poise softens it to a flinch without the rooted beat.
+            if (guardBroken && animator != null)
+            {
+                int dir = HitReaction.Direction(transform.position, modelRoot.forward, modelRoot.right, sourcePos);
+                animator.SetInteger(AnimHitDir, dir);
+                animator.SetTrigger(AnimHit);
+                _hitReactCdTimer = hitReactCooldown;
+                if (data.heavyHyperarmor <= 0f) _guardBreakTimer = data.guardBreakStagger;
+                return;
+            }
 
             // Flinch only when caught out — blocking absorbs the flinch; never mid-swing/dodge, off cooldown.
             if (!blocked && animator != null && _hitReactCdTimer <= 0f && !IsBaseInAttack() && _dodgeTimer <= 0f)

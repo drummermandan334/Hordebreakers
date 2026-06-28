@@ -80,5 +80,59 @@ namespace Hordebreakers.Tests
 
             Assert.DoesNotThrow(() => effect.Apply(Ctx(null)));
         }
+
+        // ---- New post-stamina combat dials (the Augment surface that loosens the re-gated defense) ----
+
+        [Test]
+        public void AttackSpeed_Multiplies()
+        {
+            PlayerCombatData d = ScriptableObject.CreateInstance<PlayerCombatData>();
+            d.attackSpeedMult = 1f;
+            new StatModEffect().With("target", StatTarget.AttackSpeed).With("op", StatOp.Multiply).With("amount", 1.2f)
+                .Apply(Ctx(d));
+            Assert.AreEqual(1.2f, d.attackSpeedMult, 0.0001f);
+        }
+
+        [Test]
+        public void BlockMitigation_ClampedTo01()
+        {
+            PlayerCombatData d = ScriptableObject.CreateInstance<PlayerCombatData>();
+            d.blockMitigation = 0.7f;
+            new StatModEffect().With("target", StatTarget.BlockMitigation).With("op", StatOp.Add).With("amount", 5f)
+                .Apply(Ctx(d));
+            Assert.AreEqual(1f, d.blockMitigation, 0.0001f, "mitigation can't exceed 100%");
+        }
+
+        [Test]
+        public void GuardBreakResist_RaisedFromZero()
+        {
+            PlayerCombatData d = ScriptableObject.CreateInstance<PlayerCombatData>();
+            d.guardBreakResist = 0f;
+            new StatModEffect().With("target", StatTarget.GuardBreakResist).With("op", StatOp.Add).With("amount", 1f)
+                .Apply(Ctx(d));
+            Assert.AreEqual(1f, d.guardBreakResist, 0.0001f);
+        }
+
+        [Test]
+        public void DodgeMaxCharges_AddsWholeCharge_AndIsSafeWithNullPlayer()
+        {
+            PlayerCombatData d = ScriptableObject.CreateInstance<PlayerCombatData>();
+            d.dodgeMaxCharges = 1;
+            var effect = new StatModEffect()
+                .With("target", StatTarget.DodgeMaxCharges).With("op", StatOp.Add).With("amount", 1f);
+            // Ctx(d) passes a null player; the case must null-guard the RefillDodgeCharges() callback.
+            Assert.DoesNotThrow(() => effect.Apply(Ctx(d)));
+            Assert.AreEqual(2, d.dodgeMaxCharges);
+        }
+
+        [Test]
+        public void MusouGainDealt_Multiplies()
+        {
+            PlayerCombatData d = ScriptableObject.CreateInstance<PlayerCombatData>();
+            d.musouGainDealtPerDamage = 0.9f;
+            new StatModEffect().With("target", StatTarget.MusouGainDealt).With("op", StatOp.Multiply).With("amount", 2f)
+                .Apply(Ctx(d));
+            Assert.AreEqual(1.8f, d.musouGainDealtPerDamage, 0.0001f);
+        }
     }
 }

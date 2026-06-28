@@ -14,6 +14,9 @@ namespace Hordebreakers
         public float separationRadius = 1.1f;   // the brute is bigger — wider personal space
         public float separationForce = 6f;
 
+        [Tooltip("The slam shatters a held block (guard-break) — turtling through an elite's slam should fail. Elites set this on.")]
+        public bool guardBreaks = true;
+
         [Header("Slam (telegraphed AoE)")]
         public float slamRange = 3.5f;      // begins a slam when the player is within this
         public float slamRadius = 3.5f;     // damage + telegraph radius
