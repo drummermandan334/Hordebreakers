@@ -15,7 +15,7 @@ namespace Hordebreakers
     /// (movement application, separation, clamp, knockback, hit-feel, death) live here regardless of brain.
     /// </summary>
     [RequireComponent(typeof(CapsuleCollider))]
-    public class Enemy : MonoBehaviour, IDamageable, IEnemyBody
+    public class Enemy : MonoBehaviour, IDamageable, IEnemyBody, ICrowdAgent
     {
         private enum State { Seek, Windup, Lunge, Recover }
         private enum Brain { FSM, BehaviorTree }
@@ -97,10 +97,14 @@ namespace Hordebreakers
         private Vector3 _lungeDir;
         private Vector3 _knockback;    // hit-recoil impulse
         private float _staggerTimer;   // > 0 while flinching from a hit (movement paused)
-        private bool _hasAttackToken;  // true while this rusher holds one of the shared attacker slots
+        private bool _hasAttackToken;  // true while this rusher holds an attack token (director, or static fallback)
         private int _separationMask;   // enemy + player layers, for crowd separation
+        private float _poise;          // depletes on hits; a break is a real stagger (inactive when data.maxPoise <= 0)
+        private int _agentId = -1;     // CrowdDirector handle; -1 = unmanaged (solo fallback)
+        private bool _hasSlot;         // director assigned us an approach-ring slot
+        private float _slotAngleDeg;   // absolute bearing (deg, 0 = +Z) of the assigned slot around the player
         private static readonly Collider[] _sepHits = new Collider[16];
-        private static int _activeAttackers;   // shared budget: how many StandoffLunge rushers are mid-attack right now (the attacker-cap)
+        private static int _activeAttackers;   // shared budget fallback when no CrowdDirector is present (StandoffLunge attacker-cap)
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetAttackerBudget() => _activeAttackers = 0;   // statics survive fast-enter-playmode; reset each run
@@ -112,6 +116,15 @@ namespace Hordebreakers
         private static readonly int AnimHitDir = Animator.StringToHash("HitDir");
 
         public bool IsAlive => _active && _hp > 0f;
+
+        // ---- ICrowdAgent (crowd-coordination hooks the CrowdDirector reads) ----
+        public int AgentId => _agentId;
+        public Transform AgentTransform => transform;
+        // Ring-waiters are the standoff rushers; chargers rush in and dummies don't fight, so they don't hold a slot.
+        public bool WantsSlot => _active && !_dying && _data != null && _data.archetype == AttackArchetype.StandoffLunge;
+        public float Aggression => _aggression;
+        public void AssignSlotAngle(float deg) { _slotAngleDeg = deg; _hasSlot = true; }
+        public void ClearSlot() => _hasSlot = false;
 
         private void Awake()
         {
@@ -143,6 +156,10 @@ namespace Hordebreakers
             _staggerTimer = 0f;
             _knockback = Vector3.zero;
             _separationMask = (1 << gameObject.layer) | (player != null ? (1 << player.gameObject.layer) : 0);
+            _poise = data.maxPoise;
+            _hasSlot = false;
+            _hasAttackToken = false;
+            if (CrowdDirector.Instance != null && _agentId < 0) _agentId = CrowdDirector.Instance.Register(this);   // pooled agents re-register each spawn
             if (_collider != null) _collider.enabled = true;
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
             if (_brain == Brain.BehaviorTree && _agent != null) _agent.Restart();   // reset the graph for a pooled reuse
@@ -161,6 +178,7 @@ namespace Hordebreakers
                 // Position corrections (knockback / separation / clamp) run in LateUpdate, after the tree has moved.
                 if (_cooldownTimer > 0f) _cooldownTimer -= dt;
                 if (_staggerTimer > 0f) _staggerTimer -= dt;
+                TickPoise(dt);
                 return;
             }
 
@@ -171,6 +189,7 @@ namespace Hordebreakers
             transform.position += Separation() * (_data.separationForce * dt);   // crowd separation: don't pile on / clip through
 
             if (_cooldownTimer > 0f) _cooldownTimer -= dt;
+            TickPoise(dt);
             if (_staggerTimer > 0f) { _staggerTimer -= dt; AnimStop(dt); return; }
 
             switch (_state)
@@ -191,7 +210,13 @@ namespace Hordebreakers
             ClampOutOfPlayer();
         }
 
-        private void OnDisable() => ReleaseAttackToken();   // pooled/despawned mid-attack → free the slot
+        private void OnDisable()
+        {
+            ReleaseAttackToken();   // pooled/despawned mid-attack → free the token (static fallback too)
+            if (_agentId >= 0 && CrowdDirector.Instance != null) CrowdDirector.Instance.Unregister(this);   // frees token + slot, drops from registry
+            _agentId = -1;
+            _hasSlot = false;
+        }
 
         // ---------------- FSM brain (thin orchestration over the IEnemyBody verbs) ----------------
         private void FsmSeek(float dt)
@@ -230,8 +255,16 @@ namespace Hordebreakers
             }
         }
 
-        public bool OffCooldown => _cooldownTimer <= 0f
-            && (_data.archetype != AttackArchetype.StandoffLunge || _activeAttackers < _data.maxSimultaneousAttackers);   // rusher also needs a free attacker slot
+        public bool OffCooldown
+        {
+            get
+            {
+                if (_cooldownTimer > 0f) return false;
+                if (CrowdDirector.Instance != null) return true;   // budget is enforced when the token is pulled in TryStartTelegraph
+                // No director: keep the legacy static attacker-cap pre-check (rusher needs a free slot).
+                return _data.archetype != AttackArchetype.StandoffLunge || _activeAttackers < _data.maxSimultaneousAttackers;
+            }
+        }
 
         public void ApproachStep(float dt)
         {
@@ -244,8 +277,9 @@ namespace Hordebreakers
             Vector3 dirFromPlayer = dist > 0.001f ? fromPlayer / dist : modelRoot.forward;
             FaceTowardPlayer(dt);
 
-            // approach the standoff ring, nudged to this enemy's slot so the crowd fans out
-            Vector3 ringDir = Quaternion.Euler(0f, _slotOffset, 0f) * dirFromPlayer;
+            // approach the standoff ring at the director-assigned slot bearing (the crowd spreads to distinct angles);
+            // with no director, fall back to this enemy's random slot offset off its current bearing.
+            Vector3 ringDir = _hasSlot ? SlotDir() : Quaternion.Euler(0f, _slotOffset, 0f) * dirFromPlayer;
             Vector3 ringTarget = _player.position + ringDir * HoldRing;
             Vector3 toTarget = ringTarget - transform.position; toTarget.y = 0f;
             Vector3 step = toTarget.normalized * _data.moveSpeed * dt;
@@ -264,18 +298,35 @@ namespace Hordebreakers
             float dist = fromPlayer.magnitude;
             Vector3 dirFromPlayer = dist > 0.001f ? fromPlayer / dist : modelRoot.forward;
             FaceTowardPlayer(dt);
-
-            Vector3 tangent = Vector3.Cross(Vector3.up, dirFromPlayer) * _strafeDir;
-            Vector3 radialFix = dirFromPlayer * (HoldRing - dist) * ringHoldStrength;   // hold the (wider) ring distance
             float strafe = strafeSpeedBase + strafeSpeedAggressionScale * (1f - _aggression);   // cautious enemies circle more
+            Vector3 radialFix = dirFromPlayer * (HoldRing - dist) * ringHoldStrength;   // hold the (wider) ring distance
+
+            // With a director slot, circle toward the assigned bearing and settle there (the deliberate encirclement);
+            // without one, free-circle in this enemy's strafe direction (legacy).
+            float strafeDir = _strafeDir;
+            if (_hasSlot)
+            {
+                float bearing = Mathf.Atan2(fromPlayer.x, fromPlayer.z) * Mathf.Rad2Deg;
+                float delta = Mathf.DeltaAngle(bearing, _slotAngleDeg);   // signed, toward the slot
+                strafeDir = Mathf.Abs(delta) > 3f ? Mathf.Sign(delta) : 0f;   // settle at the slot, don't jitter
+            }
+            Vector3 tangent = Vector3.Cross(Vector3.up, dirFromPlayer) * strafeDir;
             transform.position += (tangent * _data.moveSpeed * strafe + radialFix) * dt;
             SetAnimSpeed(animSpeedStrafe, animDampStrafe, dt);
         }
 
         public bool TryStartTelegraph()
         {
-            // Rusher: claim a shared attacker slot; deny (orbit) if the cap is full. Charger/others aren't capped.
-            if (_data.archetype == AttackArchetype.StandoffLunge)
+            // Claim an attack token from the crowd director (denied -> keep orbiting/menacing). The Charger's long tell
+            // counts as a "heavy" so two big telegraphs don't crescendo. With no director, fall back to the static
+            // rusher cap so solo scenes still behave.
+            bool heavy = _data.archetype == AttackArchetype.Charger;
+            if (CrowdDirector.Instance != null)
+            {
+                if (!CrowdDirector.Instance.TryBeginAttack(_agentId, 1, heavy)) return false;
+                _hasAttackToken = true;
+            }
+            else if (_data.archetype == AttackArchetype.StandoffLunge)
             {
                 if (_activeAttackers >= _data.maxSimultaneousAttackers) return false;
                 _activeAttackers++;
@@ -290,7 +341,10 @@ namespace Hordebreakers
 
         private void ReleaseAttackToken()
         {
-            if (_hasAttackToken) { _activeAttackers = Mathf.Max(0, _activeAttackers - 1); _hasAttackToken = false; }
+            if (!_hasAttackToken) return;
+            _hasAttackToken = false;
+            if (CrowdDirector.Instance != null) CrowdDirector.Instance.ReleaseToken(_agentId);   // keep the ring slot
+            else _activeAttackers = Mathf.Max(0, _activeAttackers - 1);
         }
 
         public void CancelTelegraph()
@@ -383,6 +437,20 @@ namespace Hordebreakers
 
         private void SetAnimSpeed(float value, float damp, float dt) { if (animator != null) animator.SetFloat(AnimSpeed, value, damp, dt); }
         private void AnimStop(float dt) { if (animator != null) animator.SetFloat(AnimSpeed, 0f, animDampStop, dt); }
+
+        /// <summary>World-space outward direction (from the player) at the director-assigned slot bearing (0 = +Z).</summary>
+        private Vector3 SlotDir()
+        {
+            float r = _slotAngleDeg * Mathf.Deg2Rad;
+            return new Vector3(Mathf.Sin(r), 0f, Mathf.Cos(r));
+        }
+
+        /// <summary>Regenerate poise toward the pool max while not broken (so accumulated chip eventually staggers).</summary>
+        private void TickPoise(float dt)
+        {
+            if (_data != null && _data.maxPoise > 0f && _poise < _data.maxPoise)
+                _poise = Mathf.Min(_data.maxPoise, _poise + _data.poiseRegen * dt);
+        }
 
         private void TickKnockback(float dt)
         {
@@ -486,21 +554,30 @@ namespace Hordebreakers
                 if (kb.sqrMagnitude > 0.001f) _knockback = kb.normalized * (_data.knockback + amount * _data.knockbackPerDamage);
             }
             if (_hp <= 0f) { Die(); return; }
-            if (attackTelegraph != null) attackTelegraph.Cancel();   // a hit interrupts the wind-up tell
-            if (animator != null)   // every hit flinches (action/wushu hitstun), reacting toward the hit
+
+            // Poise (weight): a light tap chips the pool but doesn't interrupt — only an emptied pool or a heavy
+            // (>= bloodMinDamage) breaks into a real stagger. maxPoise <= 0 = legacy: every hit staggers. The recoil
+            // knockback above still lands on an absorbed tap, so a light hit reads as impact without an interrupt.
+            bool staggered = PoiseTracker.Resolve(ref _poise, _data.maxPoise, amount, amount >= bloodMinDamage);
+            if (!staggered) return;
+
+            if (attackTelegraph != null) attackTelegraph.Cancel();   // a real stagger interrupts the wind-up tell
+            if (animator != null)   // flinch toward the hit
             {
                 int dir = HitReaction.Direction(transform.position, modelRoot.forward, modelRoot.right, sourcePos);
                 animator.SetInteger(AnimHitDir, dir);
                 animator.SetTrigger(AnimHit);
             }
-            ReleaseAttackToken();                 // a hit interrupts the attack → free the slot
-            _staggerTimer = _data.hitReactTime;   // pauses both brains' actions (FSM stagger-gate; BT nodes yield on IsStaggered)
-            _state = State.Seek;                  // a hit cancels a wind-up / lunge (FSM)
+            ReleaseAttackToken();                 // a real stagger interrupts the attack → free the token
+            _staggerTimer = _data.staggerDuration > 0f ? _data.staggerDuration : _data.hitReactTime;   // pauses both brains
+            _state = State.Seek;                  // a stagger cancels a wind-up / lunge (FSM)
         }
 
         private void Die()
         {
-            ReleaseAttackToken();   // free the slot if killed mid-attack
+            ReleaseAttackToken();   // free the token if killed mid-attack
+            if (CrowdDirector.Instance != null) CrowdDirector.Instance.Release(_agentId);   // free the ring slot NOW, not after the ~1s death slide
+            _hasSlot = false;
             _active = false;
             _dying = true;
             _deathTimer = _data != null ? _data.deathDuration : fallbackDeathDuration;

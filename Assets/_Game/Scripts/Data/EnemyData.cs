@@ -78,6 +78,14 @@ namespace Hordebreakers
         [Tooltip("How long a hit staggers the enemy (movement paused while it flinches).")]
         public float hitReactTime = 0.3f;
 
+        [Header("Poise (weight — light taps chip, a break is a real stagger)")]
+        [Tooltip("Poise pool. A hit depletes it by the damage dealt; emptying it (or a heavy >= bloodMinDamage) is a real stagger. <= 0 = legacy: every hit flinches.")]
+        public float maxPoise = 14f;
+        [Tooltip("Poise regenerated per second while not staggered, so accumulated chip eventually breaks.")]
+        public float poiseRegen = 6f;
+        [Tooltip("Stagger duration on a real poise-break — longer than the light hitReactTime micro-flinch.")]
+        public float staggerDuration = 0.55f;
+
         [Header("Death")]
         public float deathDuration = 1.1f;   // death anim plays this long before the body despawns
 

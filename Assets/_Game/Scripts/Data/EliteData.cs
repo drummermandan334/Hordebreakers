@@ -30,6 +30,12 @@ namespace Hordebreakers
         [Header("Hit reaction (poise — never flinches mid-slam)")]
         [Tooltip("How long a hit staggers the brute when it's not slamming.")]
         public float hitReactTime = 0.3f;
+        [Tooltip("Poise pool. Outside a slam, a hit depletes it by the damage dealt; emptying it (or a heavy >= bloodMinDamage) is a real stagger. <= 0 = legacy: every (non-slam) hit flinches.")]
+        public float maxPoise = 60f;
+        [Tooltip("Poise regenerated per second while not staggered.")]
+        public float poiseRegen = 10f;
+        [Tooltip("Stagger duration on a real poise-break.")]
+        public float staggerDuration = 0.6f;
 
         [Header("Death / Reward")]
         public float deathDuration = 1.6f;

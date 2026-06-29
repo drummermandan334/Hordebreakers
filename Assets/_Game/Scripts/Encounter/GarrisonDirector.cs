@@ -87,6 +87,7 @@ namespace Hordebreakers
         {
             if (arenaCenter == null) arenaCenter = transform;
             if (player == null) { GameObject p = GameObject.FindGameObjectWithTag("Player"); if (p != null) player = p.transform; }
+            if (CrowdDirector.Instance == null) gameObject.AddComponent<CrowdDirector>();   // the crowd brain enemies coordinate through (scene-placed one wins)
             if (huskPrefab != null) { _huskPool = new ObjectPool<Enemy>(huskPrefab, huskPoolSize, transform); _huskReturn = ReturnHusk; }
             if (brutePrefab != null) { _brutePool = new ObjectPool<Brute>(brutePrefab, brutePoolSize, transform); _bruteReturn = ReturnBrute; }
         }
@@ -135,6 +136,7 @@ namespace Hordebreakers
         private void StartWave(int n)
         {
             _waveNumber = n;
+            if (CrowdDirector.Instance != null) CrowdDirector.Instance.SetWave(n);   // escalate the attack budget with the wave
             _batchRemaining += baseWaveSize + Mathf.RoundToInt((n - 1) * waveSizeGrowth);   // accumulate (a prior batch may still be draining at the cap)
             _waveTimer = interWaveTime;
             if (n == commanderWave && !CommanderSpawned) SpawnCommander();   // the boss joins now

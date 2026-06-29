@@ -13,7 +13,7 @@ namespace Hordebreakers
     /// (default/fallback) or a Unity Behavior graph. Both drive the same <see cref="IEnemyBody"/> verbs below.
     /// </summary>
     [RequireComponent(typeof(CapsuleCollider))]
-    public class Brute : MonoBehaviour, IDamageable, IEnemyBody
+    public class Brute : MonoBehaviour, IDamageable, IEnemyBody, ICrowdAgent
     {
         private enum State { Seek, Windup, Strike, Recover }
         private enum Brain { FSM, BehaviorTree }
@@ -73,6 +73,9 @@ namespace Hordebreakers
         private float _staggerTimer;
         private Vector3 _knockback;
         private int _separationMask;
+        private float _poise;          // depletes on hits outside a slam; a break is a real stagger (inactive when data.maxPoise <= 0)
+        private int _agentId = -1;     // CrowdDirector handle; -1 = unmanaged
+        private bool _hasToken;        // holds a heavy-tell token while slamming (best-effort; the boss always commits)
         private static readonly Collider[] _sepHits = new Collider[16];
 
         private static readonly int AnimSpeed = Animator.StringToHash("Speed");
@@ -82,6 +85,14 @@ namespace Hordebreakers
         private static readonly int AnimHitDir = Animator.StringToHash("HitDir");
 
         public bool IsAlive => _active && _hp > 0f;
+
+        // ---- ICrowdAgent (the brute reserves a heavy-tell token but never ring-waits, so it holds no slot) ----
+        public int AgentId => _agentId;
+        public Transform AgentTransform => transform;
+        public bool WantsSlot => false;
+        public float Aggression => 1f;   // the boss is always top-priority threat
+        public void AssignSlotAngle(float deg) { }
+        public void ClearSlot() { }
 
         private void Awake()
         {
@@ -110,6 +121,9 @@ namespace Hordebreakers
             _knockback = Vector3.zero;
             if (_telegraph != null) _telegraph.SetActive(false);   // never carry a stale telegraph across a pool reuse
             _separationMask = (1 << gameObject.layer) | (player != null ? (1 << player.gameObject.layer) : 0);
+            _poise = data.maxPoise;
+            _hasToken = false;
+            if (CrowdDirector.Instance != null && _agentId < 0) _agentId = CrowdDirector.Instance.Register(this);   // pooled brutes re-register each spawn
             if (_collider != null) _collider.enabled = true;
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
             if (_brain == Brain.BehaviorTree && _agent != null) _agent.Restart();   // reset the graph for a pooled reuse
@@ -127,6 +141,7 @@ namespace Hordebreakers
                 // The graph drives decisions + movement; just tick timers. Corrections run in LateUpdate.
                 if (_cdTimer > 0f) _cdTimer -= dt;
                 if (_staggerTimer > 0f) _staggerTimer -= dt;
+                TickPoise(dt);
                 return;
             }
 
@@ -134,6 +149,7 @@ namespace Hordebreakers
             ClampOutOfPlayer();
             if (_state == State.Seek) transform.position += Separation() * (data.separationForce * dt);   // separation only while not mid-slam
             if (_cdTimer > 0f) _cdTimer -= dt;
+            TickPoise(dt);
             if (_staggerTimer > 0f) { _staggerTimer -= dt; AnimStop(dt); return; }
 
             switch (_state)
@@ -152,6 +168,13 @@ namespace Hordebreakers
             TickKnockback(dt);
             if (!_slamming) transform.position += Separation() * (data.separationForce * dt);
             ClampOutOfPlayer();
+        }
+
+        private void OnDisable()
+        {
+            ReleaseToken();
+            if (_agentId >= 0 && CrowdDirector.Instance != null) CrowdDirector.Instance.Unregister(this);   // frees token + slot, drops from registry
+            _agentId = -1;
         }
 
         // ---------------- FSM brain (thin orchestration over the IEnemyBody verbs) ----------------
@@ -204,6 +227,9 @@ namespace Hordebreakers
 
         public bool TryStartTelegraph()
         {
+            // Best-effort heavy reservation: a slam costs 2 and counts as a heavy tell, so chaff chargers yield while
+            // the boss winds up. The boss is NEVER denied its slam (it commits regardless) — it just reserves budget.
+            _hasToken = CrowdDirector.Instance != null && CrowdDirector.Instance.TryBeginAttack(_agentId, 2, true);
             _slamming = true;
             _slamPoint = _player.position;   // locked here — dodge out of this spot during the wind-up
             _phaseTimer = data.slamWindup;
@@ -227,6 +253,7 @@ namespace Hordebreakers
         public void CancelTelegraph()
         {
             _slamming = false;
+            ReleaseToken();
             if (attackTelegraph != null) attackTelegraph.Cancel();
             if (_telegraph != null) _telegraph.SetActive(false);
         }
@@ -260,8 +287,22 @@ namespace Hordebreakers
         {
             AnimStop(dt);
             _phaseTimer -= dt;
-            if (_phaseTimer <= 0f) { _cdTimer = data.slamCooldown; _slamming = false; return true; }
+            if (_phaseTimer <= 0f) { _cdTimer = data.slamCooldown; _slamming = false; ReleaseToken(); return true; }
             return false;
+        }
+
+        private void ReleaseToken()
+        {
+            if (!_hasToken) return;
+            _hasToken = false;
+            if (CrowdDirector.Instance != null) CrowdDirector.Instance.ReleaseToken(_agentId);
+        }
+
+        /// <summary>Regenerate poise toward the pool max while not broken (so accumulated chip eventually staggers).</summary>
+        private void TickPoise(float dt)
+        {
+            if (data != null && data.maxPoise > 0f && _poise < data.maxPoise)
+                _poise = Mathf.Min(data.maxPoise, _poise + data.poiseRegen * dt);
         }
 
         // ---------------- helpers ----------------
@@ -355,17 +396,25 @@ namespace Hordebreakers
                 Die();
                 return;
             }
-            if (!_slamming && animator != null)   // reacts to every hit, but has poise mid-slam
+            // Mid-slam = full hyperarmor (never flinches). Outside a slam, the poise pool still absorbs light taps —
+            // only an emptied pool or a heavy (>= bloodMinDamage) breaks the big bruiser into a real stagger.
+            if (!_slamming)
             {
-                int dir = HitReaction.Direction(transform.position, modelRoot.forward, modelRoot.right, sourcePos);
-                animator.SetInteger(AnimHitDir, dir);
-                animator.SetTrigger(AnimHit);
-                _staggerTimer = data.hitReactTime;
+                bool staggered = PoiseTracker.Resolve(ref _poise, data.maxPoise, amount, amount >= bloodMinDamage);
+                if (staggered && animator != null)
+                {
+                    int dir = HitReaction.Direction(transform.position, modelRoot.forward, modelRoot.right, sourcePos);
+                    animator.SetInteger(AnimHitDir, dir);
+                    animator.SetTrigger(AnimHit);
+                    _staggerTimer = data.staggerDuration > 0f ? data.staggerDuration : data.hitReactTime;
+                }
             }
         }
 
         private void Die()
         {
+            ReleaseToken();
+            if (CrowdDirector.Instance != null) CrowdDirector.Instance.Release(_agentId);
             _active = false;
             _dying = true;
             _deathTimer = data != null ? data.deathDuration : fallbackDeathDuration;
