@@ -18,9 +18,9 @@ MonoBehaviour:
   separationRadius: 1.4
   separationForce: 6
   guardBreaks: 1
-  slamRange: 4
-  slamRadius: 4
-  slamDamage: 28
+  slamRange: 3.5
+  slamRadius: 2.5
+  slamDamage: 16
   slamWindup: 1.1
   slamRecovery: 0.8
   slamCooldown: 2.5

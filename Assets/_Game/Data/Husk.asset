@@ -24,12 +24,13 @@ MonoBehaviour:
   contactInterval: 1
   contactRange: 1.4
   attackRange: 1.8
-  holdRingMult: 1.6
-  attackWindup: 0.45
+  holdRingMult: 1.15
+  maxSimultaneousAttackers: 3
+  attackWindup: 0.6
   attackRecovery: 0.45
   attackCooldown: 3
-  lungeSpeed: 8
-  lungeTime: 0.4
+  lungeSpeed: 6
+  lungeTime: 0.25
   chargeStartRange: 9
   chargeWindup: 0.7
   chargeSpeed: 16

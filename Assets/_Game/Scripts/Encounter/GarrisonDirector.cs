@@ -37,6 +37,8 @@ namespace Hordebreakers
         [Header("Waves (the finite garrison)")]
         [Tooltip("Total reinforcement waves. After the last wave, no more reinforcements — grind down what's left + the commander.")]
         [SerializeField] private int waveCount = 8;
+        [Tooltip("The commander (boss) joins when THIS wave starts — not at arena start. Set > waveCount to never spawn it (pure wave/melee testing; the arena isn't clearable then).")]
+        [SerializeField] private int commanderWave = 6;
         [Tooltip("Countdown before the FIRST wave arrives.")]
         [SerializeField] private float firstWaveDelay = 4f;
         [Tooltip("Countdown between waves — the 'next wave in Xs' the player sees.")]
@@ -98,8 +100,8 @@ namespace Hordebreakers
             _waveTimer = firstWaveDelay;
             _batchRemaining = 0;
             _batchTimer = 0f;
-            SpawnCommander();
             _running = true;
+            // The commander does NOT spawn at the start — it joins at commanderWave (see StartWave).
         }
 
         /// <summary>Stop mobilizing reinforcements (e.g. on clear). Leaves existing enemies in place.</summary>
@@ -135,6 +137,7 @@ namespace Hordebreakers
             _waveNumber = n;
             _batchRemaining += baseWaveSize + Mathf.RoundToInt((n - 1) * waveSizeGrowth);   // accumulate (a prior batch may still be draining at the cap)
             _waveTimer = interWaveTime;
+            if (n == commanderWave && !CommanderSpawned) SpawnCommander();   // the boss joins now
         }
 
         private void SpawnOneOfWave()

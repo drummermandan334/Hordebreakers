@@ -192,7 +192,15 @@ namespace Hordebreakers
             SetAnimSpeed(animSpeedMove, animDampMove, dt);
         }
 
-        public void RepositionStep(float dt) => ApproachStep(dt);   // brute doesn't strafe — keep closing in
+        public void RepositionStep(float dt)
+        {
+            // Hold at slam range instead of walking right up to the player — the slam is an AoE at your position, so
+            // it doesn't need to hug. Re-approach only if you've slipped outside slam range.
+            if (_staggerTimer > 0f) { AnimStop(dt); return; }
+            if (PlanarDist() > data.slamRange) { ApproachStep(dt); return; }
+            FaceTowardPlayer(dt);
+            AnimStop(dt);
+        }
 
         public bool TryStartTelegraph()
         {
