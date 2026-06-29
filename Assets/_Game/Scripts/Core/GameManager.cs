@@ -35,6 +35,8 @@ namespace Hordebreakers
         public int Level { get; private set; } = 1;
         public int Xp { get; private set; }
         public int XpToNext { get; private set; }
+        /// <summary>Arena spoils accrued but NOT yet banked — at risk until the arena is cleared (forfeited on death).</summary>
+        public int UncommittedXp { get; private set; }
         public int Wave { get; private set; }
         public int Kills { get; private set; }
         public bool LevelUpPending { get; private set; }
@@ -45,6 +47,7 @@ namespace Hordebreakers
         public event Action OnDraftRequested;    // fires at a breather when banked picks are ready to resolve
 
         private int _pendingLevelUps;
+        private bool _arenaXpMode;   // arena: AddXp accrues to UncommittedXp (banked on clear, dropped on death) instead of leveling immediately
         private float _hitStopTimer;
         private ObjectPool<XpGem> _gemPool;
         private Action<XpGem> _gemReturn;
@@ -108,7 +111,18 @@ namespace Hordebreakers
             OnStateChanged?.Invoke();
         }
 
+        /// <summary>Award XP. In arena mode it accrues as UNCOMMITTED (the at-risk spoils — no mid-fight leveling),
+        /// banked on clear and forfeited on death. Outside arena mode it commits immediately (the wave sandbox).</summary>
         public void AddXp(int amount)
+        {
+            if (_arenaXpMode) { UncommittedXp += amount; OnStateChanged?.Invoke(); return; }
+            CommitXp(amount);
+            OnStateChanged?.Invoke();
+        }
+
+        // The level-up loop, shared by immediate AddXp (sandbox) and BankUncommitted (arena clear). Level-ups bank
+        // silently as _pendingLevelUps; the augment pick resolves at a breather / on clear (see ResolvePendingAtBreather).
+        private void CommitXp(int amount)
         {
             Xp += amount;
             while (Xp >= XpToNext)
@@ -116,11 +130,27 @@ namespace Hordebreakers
                 Xp -= XpToNext;
                 Level++;
                 XpToNext = Mathf.RoundToInt(XpToNext * xpToNextGrowth) + xpToNextFlatAdd;
-                // Level-ups bank silently mid-arena; the augment pick resolves at the next breather
-                // (D&D-style, between encounters — see ResolvePendingAtBreather).
                 _pendingLevelUps++;
                 OnLevelUp?.Invoke(Level);
             }
+        }
+
+        /// <summary>Arena XP mode: while on, AddXp accrues to UncommittedXp instead of leveling immediately.</summary>
+        public void SetArenaXpMode(bool on) => _arenaXpMode = on;
+
+        /// <summary>Commit the at-risk arena XP into levels (call on arena clear, then ResolvePendingAtBreather to draft).</summary>
+        public void BankUncommitted()
+        {
+            int amt = UncommittedXp;
+            UncommittedXp = 0;
+            if (amt > 0) CommitXp(amt);
+            OnStateChanged?.Invoke();
+        }
+
+        /// <summary>Forfeit the at-risk arena XP (call on death — the greed spoils lost).</summary>
+        public void DiscardUncommitted()
+        {
+            UncommittedXp = 0;
             OnStateChanged?.Invoke();
         }
 

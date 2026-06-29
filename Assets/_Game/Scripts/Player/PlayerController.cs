@@ -170,6 +170,8 @@ namespace Hordebreakers
         public Transform ModelRoot => modelRoot;
         /// <summary>The player's run-scoped build (taken augments, weapons, abilities). Wrapped by the augment context.</summary>
         public PlayerLoadout Loadout => _loadout;
+        /// <summary>Fired when the player dies — the EncounterController listens to run the death → respawn sequence.</summary>
+        public event System.Action Died;
 
         private void Awake()
         {
@@ -216,6 +218,26 @@ namespace Hordebreakers
         {
             if (amount <= 0f) return;
             _hp = Mathf.Min(_hp + amount, data.maxHp);
+        }
+
+        /// <summary>Re-enable + reset the player at a checkpoint after death (arena respawn): full HP, repositioned,
+        /// and all mid-action combat state cleared so we never come back mid-swing/dodge/stagger. Keeps the run build
+        /// (the runtime <see cref="data"/> clone with its augments) — only the at-risk arena XP is lost (by the caller).</summary>
+        public void Respawn(Vector3 position)
+        {
+            gameObject.SetActive(true);
+            _hp = data.maxHp;
+            if (_cc != null) { _cc.enabled = false; transform.position = position; _cc.enabled = true; }   // CC won't fight a teleport while disabled
+            else transform.position = position;
+            _verticalVel = 0f;
+            _musou = 0f; _musouActive = false; _musouTimer = 0f;
+            _dodgeTimer = 0f; _dodgeCdTimer = 0f; _dodgeCharges = Mathf.Max(1, data.dodgeMaxCharges);
+            _blocking = false; _guardBreakTimer = 0f;
+            _attackStepTimer = 0f; _attackVel = Vector3.zero;
+            _bufferedAttack = 0; _bufferedDodge = false; _comboStep = 0;
+            _castSwing = false; _swingHitResolved = false; _nextSwingTime = 0f;
+            _hitReactCdTimer = 0f; _lastAttackStateHash = 0;
+            if (animator != null) { animator.Rebind(); animator.Update(0f); }
         }
 
         private void Update()
@@ -899,7 +921,7 @@ namespace Hordebreakers
         private void Die()
         {
             if (_voice != null) _voice.Defeat();
-            Debug.Log("[PlayerController] Player down. (Prototype: reload the scene to retry.)");
+            Died?.Invoke();                 // EncounterController runs the death → respawn sequence
             gameObject.SetActive(false);
         }
     }
