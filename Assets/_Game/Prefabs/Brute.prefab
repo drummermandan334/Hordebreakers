@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 6677229396564515604}
   - component: {fileID: 238418305063605962}
   - component: {fileID: 2527509116777081745}
+  - component: {fileID: 3807509172044000521}
   m_Layer: 8
   m_Name: Brute
   m_TagString: Untagged
@@ -72,6 +73,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 44290e07a95290d42a22391769b5cf42, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.Brute
+  _brain: 1
+  _agent: {fileID: 3807509172044000521}
   data: {fileID: 11400000, guid: e1adb07eab54db64d955ccb110fc5da3, type: 2}
   modelRoot: {fileID: 3659804169598245687}
   animator: {fileID: 3713331247831748175}
@@ -149,6 +152,26 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 112
   m_CollisionDetection: 0
+--- !u!114 &3807509172044000521
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3702476644687103685}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0038c16c34866b4f9e25c9c0dc0f7e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Behavior::Unity.Behavior.BehaviorGraphAgent
+  m_Graph: {fileID: 7646971231589391875, guid: 6c62ade094a3cff4394b11914f00422b, type: 2}
+  m_BlackboardVariableOverridesList: []
+  m_OriginalGraph: {fileID: 7646971231589391875, guid: 6c62ade094a3cff4394b11914f00422b, type: 2}
+  m_IsInitialised: 0
+  m_IsStarted: 0
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &4415120667983190380
 GameObject:
   m_ObjectHideFlags: 0

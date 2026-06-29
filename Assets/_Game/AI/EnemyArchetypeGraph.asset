@@ -1,0 +1,1028 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-9173490430823349836
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2dd922ae02c94c87a66e46a10a7319b9, type: 3}
+  m_Name: EnemyArchetypeGraph Blackboard
+  m_EditorClassIdentifier: Unity.Behavior.Authoring::Unity.Behavior.BehaviorBlackboardAuthoringAsset
+  AssetID:
+    m_Value0: 0
+    m_Value1: 0
+  m_Variables:
+  - rid: 8406688424056062031
+  m_VersionTimestamp: 639182779276809453
+  m_CommandBuffer:
+    m_Commands: []
+  m_RuntimeBlackboardAsset: {fileID: 742908076938179616}
+  references:
+    version: 2
+    RefIds:
+    - rid: 8406688424056062031
+      type: {class: 'TypedVariableModel`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        ID:
+          m_Value0: 1
+          m_Value1: 0
+        Name: Self
+        IsExposed: 1
+        m_IsShared: 0
+        m_Value: {fileID: 0}
+--- !u!114 &-2958837142208535050
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b27bb6d9a2c8d540a10dff10acc543e, type: 3}
+  m_Name: EnemyArchetypeGraph Debug Info
+  m_EditorClassIdentifier: Unity.Behavior::Unity.Behavior.BehaviorGraphDebugInfo
+  m_CodeBreakPointsList: []
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bad8f2220607dac4db5082ff333fafb8, type: 3}
+  m_Name: EnemyArchetypeGraph
+  m_EditorClassIdentifier: Unity.Behavior.Authoring::Unity.Behavior.BehaviorAuthoringGraph
+  Blackboard: {fileID: -9173490430823349836}
+  m_Description: 
+  m_Nodes:
+  - rid: 8406688424056062032
+  - rid: 8406688424056062052
+  - rid: 8406688424056062085
+  - rid: 8406688424056062100
+  - rid: 8406688424056062101
+  - rid: 8406688424056062102
+  - rid: 8406688424056062206
+  - rid: 8406688424056062219
+  - rid: 8406688424056062234
+  - rid: 8406688424056062325
+  - rid: 8406688424056062364
+  - rid: 8406688424056062365
+  - rid: 8406688424056062366
+  - rid: 8406688424056062413
+  m_VersionTimestamp: 639182806175220796
+  m_SerializedVersion: 3
+  m_DebugInfo: {fileID: -2958837142208535050}
+  m_RuntimeGraph: {fileID: 7646971231589391875}
+  AssetID:
+    m_Value0: 17640498125253468780
+    m_Value1: 3117054233830050617
+  Story:
+    Story: 
+    StoryVariableNames: []
+    Variables: []
+  m_NodeModelsInfo:
+  - Name: On Start
+    Story: 
+    RuntimeTypeString: Unity.Behavior.Start, Unity.Behavior, Version=0.0.0.0, Culture=neutral,
+      PublicKeyToken=null
+    RuntimeTypeID:
+      m_Value0: 3335272451348827663
+      m_Value1: 11549843281177505721
+    Variables: []
+    NamedChildren: []
+    IsPlaceholder: 0
+  - Name: Repeat
+    Story: 
+    RuntimeTypeString: Unity.Behavior.RepeaterModifier, Unity.Behavior, Version=0.0.0.0,
+      Culture=neutral, PublicKeyToken=null
+    RuntimeTypeID:
+      m_Value0: 3696095273264312494
+      m_Value1: 14191201703811421854
+    Variables: []
+    NamedChildren: []
+    IsPlaceholder: 0
+  - Name: Approach
+    Story: Approach until in attack range
+    RuntimeTypeString: Hordebreakers.ApproachAction, Hordebreakers, Version=0.0.0.0,
+      Culture=neutral, PublicKeyToken=null
+    RuntimeTypeID:
+      m_Value0: 5363885053224604175
+      m_Value1: 4835718903963978038
+    Variables: []
+    NamedChildren: []
+    IsPlaceholder: 0
+  - Name: Conditional Branch
+    Story: 
+    RuntimeTypeString: Unity.Behavior.BranchingConditionComposite, Unity.Behavior,
+      Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+    RuntimeTypeID:
+      m_Value0: 12334964803190848789
+      m_Value1: 14608808926743427008
+    Variables: []
+    NamedChildren:
+    - True
+    - False
+    IsPlaceholder: 0
+  - Name: Telegraph
+    Story: Telegraphed wind-up (aborts if the player escapes / we get hit)
+    RuntimeTypeString: Hordebreakers.TelegraphAction, Hordebreakers, Version=0.0.0.0,
+      Culture=neutral, PublicKeyToken=null
+    RuntimeTypeID:
+      m_Value0: 5143340603094260362
+      m_Value1: 12432085730643347985
+    Variables: []
+    NamedChildren: []
+    IsPlaceholder: 0
+  - Name: Commit Attack
+    Story: Commit the strike (dash / slam)
+    RuntimeTypeString: Hordebreakers.CommitAttackAction, Hordebreakers, Version=0.0.0.0,
+      Culture=neutral, PublicKeyToken=null
+    RuntimeTypeID:
+      m_Value0: 4864157025192597644
+      m_Value1: 3996434788497754880
+    Variables: []
+    NamedChildren: []
+    IsPlaceholder: 0
+  - Name: Recover
+    Story: Recovery after the strike
+    RuntimeTypeString: Hordebreakers.RecoverAction, Hordebreakers, Version=0.0.0.0,
+      Culture=neutral, PublicKeyToken=null
+    RuntimeTypeID:
+      m_Value0: 5701666036030895039
+      m_Value1: 11255731263765744175
+    Variables: []
+    NamedChildren: []
+    IsPlaceholder: 0
+  - Name: Reposition
+    Story: Hold/strafe until ready to attack
+    RuntimeTypeString: Hordebreakers.RepositionAction, Hordebreakers, Version=0.0.0.0,
+      Culture=neutral, PublicKeyToken=null
+    RuntimeTypeID:
+      m_Value0: 5418104169708898518
+      m_Value1: 2795623570421975890
+    Variables: []
+    NamedChildren: []
+    IsPlaceholder: 0
+  - Name: Sequence
+    Story: 
+    RuntimeTypeString: Unity.Behavior.SequenceComposite, Unity.Behavior, Version=0.0.0.0,
+      Culture=neutral, PublicKeyToken=null
+    RuntimeTypeID:
+      m_Value0: 10181448252506100447
+      m_Value1: 8737116843063128493
+    Variables: []
+    NamedChildren: []
+    IsPlaceholder: 0
+  m_Blackboards: []
+  m_MainBlackboardAuthoringAsset: {fileID: -9173490430823349836}
+  m_CommandBuffer:
+    m_Commands: []
+  m_SubgraphsInfo: []
+  m_BlackboardMissingManagedRef: 0
+  m_GraphMissingManagedRef: 0
+  m_HasMissingTypeInManagedRef: 0
+  m_EnumDependencyCache:
+    Entries: []
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 8406688424056062032
+      type: {class: StartNodeModel, ns: Unity.Behavior, asm: Unity.Behavior.Authoring}
+      data:
+        Position: {x: 0, y: 0}
+        ID:
+          m_Value0: 7132798850563417080
+          m_Value1: 10966268792843948428
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062033
+        NodeType:
+          m_SerializableType: Unity.Behavior.Start, Unity.Behavior, Version=0.0.0.0,
+            Culture=neutral, PublicKeyToken=null
+        NodeTypeID:
+          m_Value0: 3335272451348827663
+          m_Value1: 11549843281177505721
+        m_FieldValues: []
+        Repeat: 0
+        AllowMultipleRepeatsPerTick: 1
+    - rid: 8406688424056062033
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062032
+        m_Connections:
+        - rid: 8406688424056062053
+    - rid: 8406688424056062052
+      type: {class: RepeatNodeModel, ns: Unity.Behavior, asm: Unity.Behavior.Authoring}
+      data:
+        Position: {x: 0.628638, y: 97.114105}
+        ID:
+          m_Value0: 13599375158889850803
+          m_Value1: 1218807892025301019
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062053
+        - rid: 8406688424056062054
+        NodeType:
+          m_SerializableType: Unity.Behavior.RepeaterModifier, Unity.Behavior, Version=0.0.0.0,
+            Culture=neutral, PublicKeyToken=null
+        NodeTypeID:
+          m_Value0: 3696095273264312494
+          m_Value1: 14191201703811421854
+        m_FieldValues: []
+        AllowMultipleRepeatsPerTick: 0
+        <ConditionModels>k__BackingField: []
+        <RequiresAllConditionsTrue>k__BackingField: 0
+        <ShouldTruncateNodeUI>k__BackingField: 0
+        m_RepeatMode: 0
+        <ObserverType>k__BackingField: 0
+        <ReturnFailureOnConditionFail>k__BackingField: 1
+    - rid: 8406688424056062053
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062052
+        m_Connections:
+        - rid: 8406688424056062033
+    - rid: 8406688424056062054
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062052
+        m_Connections:
+        - rid: 8406688424056062107
+    - rid: 8406688424056062085
+      type: {class: ActionNodeModel, ns: Unity.Behavior, asm: Unity.Behavior.Authoring}
+      data:
+        Position: {x: 106.27976, y: 425.3918}
+        ID:
+          m_Value0: 14332985149540618756
+          m_Value1: 13673758255978321191
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062086
+        - rid: 8406688424056062087
+        NodeType:
+          m_SerializableType: Hordebreakers.ApproachAction, Hordebreakers, Version=0.0.0.0,
+            Culture=neutral, PublicKeyToken=null
+        NodeTypeID:
+          m_Value0: 5363885053224604175
+          m_Value1: 4835718903963978038
+        m_FieldValues: []
+    - rid: 8406688424056062086
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062085
+        m_Connections:
+        - rid: 8406688424056062106
+    - rid: 8406688424056062087
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062085
+        m_Connections: []
+    - rid: 8406688424056062100
+      type: {class: FloatingPortNodeModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        Position: {x: -279.03116, y: 318.31235}
+        ID:
+          m_Value0: 7777496543723570222
+          m_Value1: 17209510351345681420
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062103
+        - rid: 8406688424056062104
+        ParentNodeID:
+          m_Value0: 9701303151648988502
+          m_Value1: 8885601153190478753
+        PortName: True
+        Metadata: 
+    - rid: 8406688424056062101
+      type: {class: FloatingPortNodeModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        Position: {x: 103.998924, y: 320.24982}
+        ID:
+          m_Value0: 8013030616554640794
+          m_Value1: 13773125360735080762
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062105
+        - rid: 8406688424056062106
+        ParentNodeID:
+          m_Value0: 9701303151648988502
+          m_Value1: 8885601153190478753
+        PortName: False
+        Metadata: 
+    - rid: 8406688424056062102
+      type: {class: BranchingConditionNodeModel, ns: Unity.Behavior, asm: Unity.Behavior.Authoring}
+      data:
+        Position: {x: -52.268967, y: 195.36433}
+        ID:
+          m_Value0: 9701303151648988502
+          m_Value1: 8885601153190478753
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062107
+        - rid: 8406688424056062108
+        - rid: 8406688424056062109
+        NodeType:
+          m_SerializableType: Unity.Behavior.BranchingConditionComposite, Unity.Behavior,
+            Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+        NodeTypeID:
+          m_Value0: 12334964803190848789
+          m_Value1: 14608808926743427008
+        m_FieldValues: []
+        <ConditionModels>k__BackingField:
+        - ConditionType:
+            m_SerializableType: Hordebreakers.InAttackRangeCondition, Hordebreakers,
+              Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+          ConditionTypeID:
+            m_Value0: 5476383778129868531
+            m_Value1: 7216652599430678918
+          NodeModel:
+            rid: 8406688424056062102
+          m_FieldValues: []
+          OperatorFieldModel:
+            rid: -2
+        <RequiresAllConditionsTrue>k__BackingField: 1
+        <ShouldTruncateNodeUI>k__BackingField: 0
+        <ObserverType>k__BackingField: 0
+    - rid: 8406688424056062103
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 1
+        m_NodeModel:
+          rid: 8406688424056062100
+        m_Connections:
+        - rid: 8406688424056062108
+    - rid: 8406688424056062104
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062100
+        m_Connections:
+        - rid: 8406688424056062371
+    - rid: 8406688424056062105
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 1
+        m_NodeModel:
+          rid: 8406688424056062101
+        m_Connections:
+        - rid: 8406688424056062109
+    - rid: 8406688424056062106
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062101
+        m_Connections:
+        - rid: 8406688424056062086
+    - rid: 8406688424056062107
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062102
+        m_Connections:
+        - rid: 8406688424056062054
+    - rid: 8406688424056062108
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: True
+        m_PortDataFlowType: 1
+        m_IsFloating: 1
+        m_NodeModel:
+          rid: 8406688424056062102
+        m_Connections:
+        - rid: 8406688424056062103
+    - rid: 8406688424056062109
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: False
+        m_PortDataFlowType: 1
+        m_IsFloating: 1
+        m_NodeModel:
+          rid: 8406688424056062102
+        m_Connections:
+        - rid: 8406688424056062105
+    - rid: 8406688424056062206
+      type: {class: ActionNodeModel, ns: Unity.Behavior, asm: Unity.Behavior.Authoring}
+      data:
+        Position: {x: -577.8269, y: 654.84796}
+        ID:
+          m_Value0: 3031177161833894555
+          m_Value1: 4123152972362572358
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062207
+        - rid: 8406688424056062208
+        NodeType:
+          m_SerializableType: Hordebreakers.TelegraphAction, Hordebreakers, Version=0.0.0.0,
+            Culture=neutral, PublicKeyToken=null
+        NodeTypeID:
+          m_Value0: 5143340603094260362
+          m_Value1: 12432085730643347985
+        m_FieldValues: []
+    - rid: 8406688424056062207
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062206
+        m_Connections:
+        - rid: 8406688424056062415
+    - rid: 8406688424056062208
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062206
+        m_Connections:
+        - rid: 8406688424056062220
+    - rid: 8406688424056062219
+      type: {class: ActionNodeModel, ns: Unity.Behavior, asm: Unity.Behavior.Authoring}
+      data:
+        Position: {x: -574.92175, y: 724.81775}
+        ID:
+          m_Value0: 9672840156851866721
+          m_Value1: 14217680410577274580
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062220
+        - rid: 8406688424056062221
+        NodeType:
+          m_SerializableType: Hordebreakers.CommitAttackAction, Hordebreakers, Version=0.0.0.0,
+            Culture=neutral, PublicKeyToken=null
+        NodeTypeID:
+          m_Value0: 4864157025192597644
+          m_Value1: 3996434788497754880
+        m_FieldValues: []
+    - rid: 8406688424056062220
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062219
+        m_Connections:
+        - rid: 8406688424056062208
+    - rid: 8406688424056062221
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062219
+        m_Connections:
+        - rid: 8406688424056062235
+    - rid: 8406688424056062234
+      type: {class: ActionNodeModel, ns: Unity.Behavior, asm: Unity.Behavior.Authoring}
+      data:
+        Position: {x: -576.85834, y: 806.97144}
+        ID:
+          m_Value0: 18288077532491418267
+          m_Value1: 10384328009519090962
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062235
+        - rid: 8406688424056062236
+        NodeType:
+          m_SerializableType: Hordebreakers.RecoverAction, Hordebreakers, Version=0.0.0.0,
+            Culture=neutral, PublicKeyToken=null
+        NodeTypeID:
+          m_Value0: 5701666036030895039
+          m_Value1: 11255731263765744175
+        m_FieldValues: []
+    - rid: 8406688424056062235
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062234
+        m_Connections:
+        - rid: 8406688424056062221
+    - rid: 8406688424056062236
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062234
+        m_Connections: []
+    - rid: 8406688424056062325
+      type: {class: ActionNodeModel, ns: Unity.Behavior, asm: Unity.Behavior.Authoring}
+      data:
+        Position: {x: -182.18839, y: 624.95807}
+        ID:
+          m_Value0: 17596123494329519081
+          m_Value1: 6497591714143313092
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062326
+        - rid: 8406688424056062327
+        NodeType:
+          m_SerializableType: Hordebreakers.RepositionAction, Hordebreakers, Version=0.0.0.0,
+            Culture=neutral, PublicKeyToken=null
+        NodeTypeID:
+          m_Value0: 5418104169708898518
+          m_Value1: 2795623570421975890
+        m_FieldValues: []
+    - rid: 8406688424056062326
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062325
+        m_Connections:
+        - rid: 8406688424056062370
+    - rid: 8406688424056062327
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062325
+        m_Connections: []
+    - rid: 8406688424056062364
+      type: {class: FloatingPortNodeModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        Position: {x: -582.648, y: 497.17352}
+        ID:
+          m_Value0: 10161918231354322958
+          m_Value1: 5619596876083803116
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062367
+        - rid: 8406688424056062368
+        ParentNodeID:
+          m_Value0: 14157224568672883542
+          m_Value1: 15656639908670965407
+        PortName: True
+        Metadata: 
+    - rid: 8406688424056062365
+      type: {class: FloatingPortNodeModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        Position: {x: -181.26404, y: 511.69672}
+        ID:
+          m_Value0: 16603741149630644950
+          m_Value1: 16829554983711899861
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062369
+        - rid: 8406688424056062370
+        ParentNodeID:
+          m_Value0: 14157224568672883542
+          m_Value1: 15656639908670965407
+        PortName: False
+        Metadata: 
+    - rid: 8406688424056062366
+      type: {class: BranchingConditionNodeModel, ns: Unity.Behavior, asm: Unity.Behavior.Authoring}
+      data:
+        Position: {x: -357.7507, y: 407.18784}
+        ID:
+          m_Value0: 14157224568672883542
+          m_Value1: 15656639908670965407
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062371
+        - rid: 8406688424056062372
+        - rid: 8406688424056062373
+        NodeType:
+          m_SerializableType: Unity.Behavior.BranchingConditionComposite, Unity.Behavior,
+            Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+        NodeTypeID:
+          m_Value0: 12334964803190848789
+          m_Value1: 14608808926743427008
+        m_FieldValues: []
+        <ConditionModels>k__BackingField:
+        - ConditionType:
+            m_SerializableType: Hordebreakers.OffCooldownCondition, Hordebreakers,
+              Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+          ConditionTypeID:
+            m_Value0: 4873155385755546298
+            m_Value1: 9029620312248028087
+          NodeModel:
+            rid: 8406688424056062366
+          m_FieldValues: []
+          OperatorFieldModel:
+            rid: -2
+        <RequiresAllConditionsTrue>k__BackingField: 0
+        <ShouldTruncateNodeUI>k__BackingField: 0
+        <ObserverType>k__BackingField: 0
+    - rid: 8406688424056062367
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 1
+        m_NodeModel:
+          rid: 8406688424056062364
+        m_Connections:
+        - rid: 8406688424056062372
+    - rid: 8406688424056062368
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062364
+        m_Connections:
+        - rid: 8406688424056062414
+    - rid: 8406688424056062369
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 1
+        m_NodeModel:
+          rid: 8406688424056062365
+        m_Connections:
+        - rid: 8406688424056062373
+    - rid: 8406688424056062370
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062365
+        m_Connections:
+        - rid: 8406688424056062326
+    - rid: 8406688424056062371
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062366
+        m_Connections:
+        - rid: 8406688424056062104
+    - rid: 8406688424056062372
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: True
+        m_PortDataFlowType: 1
+        m_IsFloating: 1
+        m_NodeModel:
+          rid: 8406688424056062366
+        m_Connections:
+        - rid: 8406688424056062367
+    - rid: 8406688424056062373
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: False
+        m_PortDataFlowType: 1
+        m_IsFloating: 1
+        m_NodeModel:
+          rid: 8406688424056062366
+        m_Connections:
+        - rid: 8406688424056062369
+    - rid: 8406688424056062413
+      type: {class: CompositeNodeModel, ns: Unity.Behavior, asm: Unity.Behavior.Authoring}
+      data:
+        Position: {x: -581.6796, y: 581.8794}
+        ID:
+          m_Value0: 3773809639501324699
+          m_Value1: 15340909120194615343
+        Parents: []
+        PortModels:
+        - rid: 8406688424056062414
+        - rid: 8406688424056062415
+        NodeType:
+          m_SerializableType: Unity.Behavior.SequenceComposite, Unity.Behavior, Version=0.0.0.0,
+            Culture=neutral, PublicKeyToken=null
+        NodeTypeID:
+          m_Value0: 10181448252506100447
+          m_Value1: 8737116843063128493
+        m_FieldValues: []
+    - rid: 8406688424056062414
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: InputPort
+        m_PortDataFlowType: 0
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062413
+        m_Connections:
+        - rid: 8406688424056062368
+    - rid: 8406688424056062415
+      type: {class: PortModel, ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        m_Name: OutputPort
+        m_PortDataFlowType: 1
+        m_IsFloating: 0
+        m_NodeModel:
+          rid: 8406688424056062413
+        m_Connections:
+        - rid: 8406688424056062207
+--- !u!114 &742908076938179616
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c02bb70996b49eba31d0c206e28da24, type: 3}
+  m_Name: EnemyArchetypeGraph Blackboard
+  m_EditorClassIdentifier: Unity.Behavior::Unity.Behavior.RuntimeBlackboardAsset
+  VersionTimestamp: 639182779276809453
+  AssetID:
+    m_Value0: 0
+    m_Value1: 0
+  m_Blackboard:
+    m_Variables:
+    - rid: 8406688424056062034
+  m_SharedBlackboardVariableGuids: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 8406688424056062034
+      type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 1
+          m_Value1: 0
+        Name: Self
+        m_Value: {fileID: 0}
+--- !u!114 &7646971231589391875
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db920e62f70f420bb33c771449926fa4, type: 3}
+  m_Name: EnemyArchetypeGraph
+  m_EditorClassIdentifier: Unity.Behavior::Unity.Behavior.BehaviorGraph
+  Graphs:
+  - rid: 8406688424056062035
+  m_DebugInfo: {fileID: -2958837142208535050}
+  m_WasCompileWithPlaceholderNode: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 8406688424056062035
+      type: {class: BehaviorGraphModule, ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        AuthoringAssetID:
+          m_Value0: 17640498125253468780
+          m_Value1: 3117054233830050617
+        m_DebugInfo: {fileID: -2958837142208535050}
+        BlackboardReference:
+          rid: 8406688424056062036
+        BlackboardGroupReferences: []
+        Root:
+          rid: 8406688424056062490
+        m_VersionTimestamp: 639182806175220796
+    - rid: 8406688424056062036
+      type: {class: BlackboardReference, ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        m_Blackboard:
+          rid: 8406688424056062038
+        m_Source: {fileID: 742908076938179616}
+    - rid: 8406688424056062038
+      type: {class: Blackboard, ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        m_Variables:
+        - rid: 8406688424056062039
+    - rid: 8406688424056062039
+      type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 1
+          m_Value1: 0
+        Name: Self
+        m_Value: {fileID: 0}
+    - rid: 8406688424056062490
+      type: {class: Start, ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        ID:
+          m_Value0: 7132798850563417080
+          m_Value1: 10966268792843948428
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: -2
+        m_Child:
+          rid: 8406688424056062491
+        Repeat: 0
+        AllowMultipleRepeatsPerTick: 1
+    - rid: 8406688424056062491
+      type: {class: RepeaterModifier, ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        ID:
+          m_Value0: 13599375158889850803
+          m_Value1: 1218807892025301019
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: 8406688424056062490
+        m_Child:
+          rid: 8406688424056062492
+        m_AllowMultipleRepeatsPerTick: 0
+    - rid: 8406688424056062492
+      type: {class: BranchingConditionComposite, ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        ID:
+          m_Value0: 9701303151648988502
+          m_Value1: 8885601153190478753
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: 8406688424056062491
+        m_Children:
+        - rid: 8406688424056062493
+        - rid: 8406688424056062494
+        m_RegisteredObservers: []
+        m_Conditions:
+        - rid: 8406688424056062495
+        m_RequiresAllConditions: 1
+        True:
+          rid: 8406688424056062493
+        False:
+          rid: 8406688424056062494
+        m_CurrentChild:
+          rid: -2
+        m_ObserverType: 0
+    - rid: 8406688424056062493
+      type: {class: BranchingConditionComposite, ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        ID:
+          m_Value0: 14157224568672883542
+          m_Value1: 15656639908670965407
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: 8406688424056062492
+        m_Children:
+        - rid: 8406688424056062496
+        - rid: 8406688424056062497
+        m_RegisteredObservers: []
+        m_Conditions:
+        - rid: 8406688424056062498
+        m_RequiresAllConditions: 0
+        True:
+          rid: 8406688424056062496
+        False:
+          rid: 8406688424056062497
+        m_CurrentChild:
+          rid: -2
+        m_ObserverType: 0
+    - rid: 8406688424056062494
+      type: {class: ApproachAction, ns: Hordebreakers, asm: Hordebreakers}
+      data:
+        ID:
+          m_Value0: 14332985149540618756
+          m_Value1: 13673758255978321191
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: 8406688424056062492
+    - rid: 8406688424056062495
+      type: {class: InAttackRangeCondition, ns: Hordebreakers, asm: Hordebreakers}
+      data:
+        Graph:
+          rid: 8406688424056062035
+    - rid: 8406688424056062496
+      type: {class: SequenceComposite, ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        ID:
+          m_Value0: 3773809639501324699
+          m_Value1: 15340909120194615343
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: 8406688424056062493
+        m_Children:
+        - rid: 8406688424056062499
+        m_RegisteredObservers: []
+    - rid: 8406688424056062497
+      type: {class: RepositionAction, ns: Hordebreakers, asm: Hordebreakers}
+      data:
+        ID:
+          m_Value0: 17596123494329519081
+          m_Value1: 6497591714143313092
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: 8406688424056062493
+    - rid: 8406688424056062498
+      type: {class: OffCooldownCondition, ns: Hordebreakers, asm: Hordebreakers}
+      data:
+        Graph:
+          rid: 8406688424056062035
+    - rid: 8406688424056062499
+      type: {class: SequenceComposite, ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        ID:
+          m_Value0: 3031177161833894555
+          m_Value1: 4123152972362572358
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: 8406688424056062496
+        m_Children:
+        - rid: 8406688424056062500
+        - rid: 8406688424056062501
+        m_RegisteredObservers: []
+    - rid: 8406688424056062500
+      type: {class: TelegraphAction, ns: Hordebreakers, asm: Hordebreakers}
+      data:
+        ID:
+          m_Value0: 3031177161833894555
+          m_Value1: 4123152972362572358
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: 8406688424056062499
+    - rid: 8406688424056062501
+      type: {class: SequenceComposite, ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        ID:
+          m_Value0: 9672840156851866721
+          m_Value1: 14217680410577274580
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: 8406688424056062499
+        m_Children:
+        - rid: 8406688424056062502
+        - rid: 8406688424056062503
+        m_RegisteredObservers: []
+    - rid: 8406688424056062502
+      type: {class: CommitAttackAction, ns: Hordebreakers, asm: Hordebreakers}
+      data:
+        ID:
+          m_Value0: 9672840156851866721
+          m_Value1: 14217680410577274580
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: 8406688424056062501
+    - rid: 8406688424056062503
+      type: {class: RecoverAction, ns: Hordebreakers, asm: Hordebreakers}
+      data:
+        ID:
+          m_Value0: 18288077532491418267
+          m_Value1: 10384328009519090962
+        Graph:
+          rid: 8406688424056062035
+        m_Parent:
+          rid: 8406688424056062501

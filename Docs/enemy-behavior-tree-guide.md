@@ -22,26 +22,24 @@ structural.
 1. **Create the asset:** Project window → right-click → **Create ▸ Behavior ▸ Behavior Graph**. Name it
    **`EnemyArchetypeGraph`**. Suggested location: `Assets/_Game/AI/`. Double-click to open the Behavior editor.
 
-2. **Build this tree.** All custom nodes are in the Add-node search under **Action/Hordebreakers** and
-   **Conditions/Hordebreakers**; the composites (Repeat, Selector, Sequence) are the built-ins.
+2. **Build this tree.** The conditions (`In Attack Range`, `Off Cooldown`) attach to **Conditional Branch** nodes
+   (that's how Unity Behavior uses conditions). Use a **nested** Conditional Branch so *every* branch has a child —
+   a Conditional Branch whose false-side is empty doesn't fail, so a Selector wouldn't fall through (enemies freeze).
+   The actions are under **Action/Hordebreakers**; on a Conditional Branch, pick the condition from
+   **Conditions/Hordebreakers**.
 
    ```
    On Start
-   └─ Repeat            (run forever — the AI loops)
-      └─ Selector       (try each branch top→bottom; first that runs/succeeds wins)
-         ├─ Sequence              ← ATTACK (only when in range AND ready)
-         │   ├─ In Attack Range   (Condition)
-         │   ├─ Off Cooldown      (Condition)
-         │   ├─ Telegraph         (Action)
-         │   ├─ Commit Attack     (Action)
-         │   └─ Recover           (Action)
-         ├─ Sequence              ← HOLD (in range but cooling down)
-         │   ├─ In Attack Range   (Condition)
-         │   └─ Reposition        (Action)
-         └─ Approach              (Action)   ← default: close the distance
+   └─ Repeat                                   (run forever — the AI loops)
+      └─ Conditional Branch  [In Attack Range]
+         ├─ True  → Conditional Branch  [Off Cooldown]
+         │            ├─ True  → Sequence:  Telegraph → Commit Attack → Recover     (attack)
+         │            └─ False → Reposition                                         (in range, cooling — hold/strafe)
+         └─ False → Approach                                                        (out of range — close in)
    ```
 
-   Order matters — keep the three Selector branches **top to bottom** as shown (attack, then hold, then approach).
+   So: in range + ready → attack; in range + cooling → reposition; otherwise → approach. Every branch is filled, so
+   there are no "no child to run" warnings.
 
 3. **No blackboard variables.** Leave the Blackboard empty. Save the graph (Ctrl+S).
 

@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 5631306810770974431}
   - component: {fileID: 5977897991015393070}
   - component: {fileID: 6563594823347024046}
+  - component: {fileID: 6403387643381047678}
   m_Layer: 8
   m_Name: Husk
   m_TagString: Untagged
@@ -72,6 +73,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a8a9924d7eb0fae4d97f51b2df072e59, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.Enemy
+  _brain: 1
+  _agent: {fileID: 6403387643381047678}
   modelRoot: {fileID: 549152637073393773}
   animator: {fileID: 487123151603181449}
   hitFlash: {fileID: 0}
@@ -90,6 +93,7 @@ MonoBehaviour:
   strafeSpeedBase: 0.3
   strafeSpeedAggressionScale: 0.35
   lungeConnectReachMult: 1.25
+  telegraphAbortReachMult: 1.5
   animSpeedApproach: 1
   animDampApproach: 0.12
   animSpeedStrafe: 0.45
@@ -157,6 +161,26 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 112
   m_CollisionDetection: 0
+--- !u!114 &6403387643381047678
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200088345215572852}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0038c16c34866b4f9e25c9c0dc0f7e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Behavior::Unity.Behavior.BehaviorGraphAgent
+  m_Graph: {fileID: 7646971231589391875, guid: 6c62ade094a3cff4394b11914f00422b, type: 2}
+  m_BlackboardVariableOverridesList: []
+  m_OriginalGraph: {fileID: 7646971231589391875, guid: 6c62ade094a3cff4394b11914f00422b, type: 2}
+  m_IsInitialised: 0
+  m_IsStarted: 0
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &2077714056716460879
 GameObject:
   m_ObjectHideFlags: 0
