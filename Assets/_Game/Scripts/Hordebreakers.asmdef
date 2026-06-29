@@ -5,7 +5,9 @@
         "Unity.InputSystem",
         "Unity.TextMeshPro",
         "Unity.Cinemachine",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.Behavior",
+        "Unity.Properties"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

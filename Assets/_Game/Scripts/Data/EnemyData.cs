@@ -19,6 +19,8 @@ namespace Hordebreakers
         [Header("Stats")]
         public float maxHp = 12f;
         public float moveSpeed = 3f;
+        [Tooltip("How fast the body turns to face the player (deg/sec). Lower = creatures pivot instead of turret-snapping; lets a strafing player flank them.")]
+        public float turnSpeedDeg = 540f;
 
         [Header("Crowd separation")]
         public float separationRadius = 0.7f;   // push apart from enemies/player within this

@@ -9,6 +9,8 @@ namespace Hordebreakers
         [Header("Stats")]
         public float maxHp = 120f;
         public float moveSpeed = 2.2f;
+        [Tooltip("How fast the brute turns to face the player (deg/sec). Slow — a heavy bruiser pivots, so a quick player can get around it.")]
+        public float turnSpeedDeg = 200f;
 
         [Header("Crowd separation")]
         public float separationRadius = 1.1f;   // the brute is bigger — wider personal space

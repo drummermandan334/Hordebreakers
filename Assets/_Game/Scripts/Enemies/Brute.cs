@@ -1,16 +1,28 @@
 using System;
+using Unity.Behavior;
 using UnityEngine;
 
 namespace Hordebreakers
 {
     /// <summary>
-    /// Pooled elite. Slow seek; when the player is close it commits to a telegraphed slam
-    /// (ground decal during the windup = the dodge window), then deals AoE damage at that spot.
-    /// High HP, so the reward loop is: dodge the slam, then punish the recovery.
+    /// Pooled elite. Slow seek; when the player is close it commits to a telegraphed slam (ground decal during the
+    /// wind-up = the dodge window), then deals AoE damage at that spot. High HP + poise (never flinches mid-slam), so
+    /// the loop is: dodge the slam, then punish the recovery.
+    ///
+    /// Like <see cref="Enemy"/>, decisions run through one of two BRAINS (<see cref="_brain"/>): the hand-rolled FSM
+    /// (default/fallback) or a Unity Behavior graph. Both drive the same <see cref="IEnemyBody"/> verbs below.
     /// </summary>
     [RequireComponent(typeof(CapsuleCollider))]
-    public class Brute : MonoBehaviour, IDamageable
+    public class Brute : MonoBehaviour, IDamageable, IEnemyBody
     {
+        private enum State { Seek, Windup, Strike, Recover }
+        private enum Brain { FSM, BehaviorTree }
+
+        [Tooltip("FSM = the hand-rolled state machine (fallback). BehaviorTree = a Unity Behavior graph on the agent below.")]
+        [SerializeField] private Brain _brain = Brain.FSM;
+        [Tooltip("Behavior graph agent (only used when brain = BehaviorTree). Auto-found in Awake.")]
+        [SerializeField] private BehaviorGraphAgent _agent;
+
         [SerializeField] private EliteData data;
         [SerializeField] private Transform modelRoot;
         [SerializeField] private Animator animator;
@@ -52,11 +64,11 @@ namespace Hordebreakers
         private bool _active;
         private bool _dying;
         private float _deathTimer;
+        private State _state;
         private float _cdTimer;
-        private bool _slamming;
-        private float _slamTimer;
-        private bool _slamHitPending;
-        private Vector3 _slamPoint;
+        private bool _slamming;        // true through the whole slam (windup→strike→recover) — drives poise + skips separation
+        private float _phaseTimer;     // FSM state time + the body's telegraph/recover phase timer
+        private Vector3 _slamPoint;    // where the slam will land (locked at wind-up start — dodge out of it)
         private GameObject _telegraph;
         private float _staggerTimer;
         private Vector3 _knockback;
@@ -78,18 +90,21 @@ namespace Hordebreakers
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (hitFlash == null) hitFlash = GetComponentInChildren<HitFlash>();
             if (attackTelegraph == null) attackTelegraph = GetComponentInChildren<AttackTelegraph>();
+            if (_agent == null) _agent = GetComponent<BehaviorGraphAgent>();
         }
 
-        public void Init(Transform player, Action<Brute> ret)
+        public void Init(Transform player, Action<Brute> ret, EliteData dataOverride = null)
         {
+            if (dataOverride != null) data = dataOverride;   // GarrisonDirector passes regular vs commander EliteData from one pool
             _player = player;
             _playerDmg = player != null ? player.GetComponent<IDamageable>() : null;
             _return = ret;
             _hp = data.maxHp;
             _active = true;
             _dying = false;
+            _state = State.Seek;
             _slamming = false;
-            _slamHitPending = false;
+            _phaseTimer = 0f;
             _cdTimer = initialSlamCooldown;
             _staggerTimer = 0f;
             _knockback = Vector3.zero;
@@ -97,54 +112,93 @@ namespace Hordebreakers
             _separationMask = (1 << gameObject.layer) | (player != null ? (1 << player.gameObject.layer) : 0);
             if (_collider != null) _collider.enabled = true;
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
+            if (_brain == Brain.BehaviorTree && _agent != null) _agent.Restart();   // reset the graph for a pooled reuse
         }
 
         private void Update()
         {
             float dt = Time.deltaTime;
 
-            if (_dying)
-            {
-                if (_knockback.sqrMagnitude > 0.0001f)   // ride the death knockback while the body falls
-                {
-                    transform.position += _knockback * dt;
-                    _knockback = Vector3.Lerp(_knockback, Vector3.zero, 1f - Mathf.Exp(-knockbackDecayRate * dt));
-                }
-                _deathTimer -= dt;
-                if (_deathTimer <= 0f) { _dying = false; _return?.Invoke(this); }
-                return;
-            }
+            if (_dying) { TickDying(dt); return; }
             if (!_active || _player == null) return;
 
-            ClampOutOfPlayer();   // never stand inside the player
-
-            if (_slamming) { TickSlam(dt); return; }
-
-            transform.position += Separation() * (data.separationForce * dt);   // crowd separation
-            if (_cdTimer > 0f) _cdTimer -= dt;
-            if (_staggerTimer > 0f) { _staggerTimer -= dt; if (animator != null) animator.SetFloat(AnimSpeed, 0f, animDampStop, dt); return; }
-
-            Vector3 to = _player.position - transform.position; to.y = 0f;
-            float dist = to.magnitude;
-
-            if (dist <= data.slamRange && _cdTimer <= 0f) { StartSlam(); return; }
-
-            if (dist > 0.05f)
+            if (_brain == Brain.BehaviorTree)
             {
-                Vector3 dir = to / dist;
-                transform.position += dir * data.moveSpeed * dt;
-                modelRoot.rotation = Quaternion.LookRotation(dir);
+                // The graph drives decisions + movement; just tick timers. Corrections run in LateUpdate.
+                if (_cdTimer > 0f) _cdTimer -= dt;
+                if (_staggerTimer > 0f) _staggerTimer -= dt;
+                return;
             }
-            if (animator != null) animator.SetFloat(AnimSpeed, animSpeedMove, animDampMove, dt);
+
+            // ---- FSM brain (fallback) ----
+            ClampOutOfPlayer();
+            if (_state == State.Seek) transform.position += Separation() * (data.separationForce * dt);   // separation only while not mid-slam
+            if (_cdTimer > 0f) _cdTimer -= dt;
+            if (_staggerTimer > 0f) { _staggerTimer -= dt; AnimStop(dt); return; }
+
+            switch (_state)
+            {
+                case State.Seek:    FsmSeek(dt);    break;
+                case State.Windup:  FsmWindup(dt);  break;
+                case State.Strike:  FsmStrike(dt);  break;
+                case State.Recover: FsmRecover(dt); break;
+            }
         }
 
-        private void StartSlam()
+        private void LateUpdate()
+        {
+            if (_brain != Brain.BehaviorTree || _dying || !_active || _player == null) return;
+            float dt = Time.deltaTime;
+            TickKnockback(dt);
+            if (!_slamming) transform.position += Separation() * (data.separationForce * dt);
+            ClampOutOfPlayer();
+        }
+
+        // ---------------- FSM brain (thin orchestration over the IEnemyBody verbs) ----------------
+        private void FsmSeek(float dt)
+        {
+            if (!InAttackRange) { ApproachStep(dt); return; }
+            if (OffCooldown) { StartTelegraph(); _state = State.Windup; return; }
+            RepositionStep(dt);
+        }
+
+        private void FsmWindup(float dt)
+        {
+            if (TickTelegraph(dt)) { StartAttack(); _state = State.Strike; }
+        }
+
+        private void FsmStrike(float dt)
+        {
+            if (TickAttack(dt)) { StartRecover(); _state = State.Recover; }
+        }
+
+        private void FsmRecover(float dt)
+        {
+            if (TickRecover(dt)) _state = State.Seek;
+        }
+
+        // ---------------- IEnemyBody (the body API — driven by both brains) ----------------
+        public bool IsStaggered => _staggerTimer > 0f;
+        public bool InAttackRange => PlanarDist() <= data.slamRange;
+        public bool OffCooldown => _cdTimer <= 0f;
+
+        public void ApproachStep(float dt)
+        {
+            if (_staggerTimer > 0f) { AnimStop(dt); return; }
+            Vector3 to = _player.position - transform.position; to.y = 0f;
+            float dist = to.magnitude;
+            FaceTowardPlayer(dt);
+            if (dist > 0.05f) transform.position += (to / dist) * data.moveSpeed * dt;
+            SetAnimSpeed(animSpeedMove, animDampMove, dt);
+        }
+
+        public void RepositionStep(float dt) => ApproachStep(dt);   // brute doesn't strafe — keep closing in
+
+        public void StartTelegraph()
         {
             _slamming = true;
-            _slamTimer = data.slamWindup + data.slamRecovery;
-            _slamHitPending = true;
-            _slamPoint = _player.position;
-
+            _slamPoint = _player.position;   // locked here — dodge out of this spot during the wind-up
+            _phaseTimer = data.slamWindup;
             if (animator != null) { animator.SetFloat(AnimSpeed, 0f); animator.SetTrigger(AnimAttack); }
             if (attackTelegraph != null) attackTelegraph.Begin(data.slamWindup);   // glow only during the dodge window
             Vector3 d = _slamPoint - transform.position; d.y = 0f;
@@ -161,30 +215,84 @@ namespace Hordebreakers
             }
         }
 
-        private void TickSlam(float dt)
+        public void CancelTelegraph()
         {
-            _slamTimer -= dt;
-            float since = (data.slamWindup + data.slamRecovery) - _slamTimer;
+            _slamming = false;
+            if (attackTelegraph != null) attackTelegraph.Cancel();
+            if (_telegraph != null) _telegraph.SetActive(false);
+        }
 
-            if (_slamHitPending && since >= data.slamWindup)
+        public bool TickTelegraph(float dt)
+        {
+            FaceTowardPlayer(dt);   // slow turn (low turnSpeedDeg) — readable, can be juked
+            _phaseTimer -= dt;
+            return _phaseTimer <= 0f;
+        }
+
+        public bool TelegraphShouldAbort => false;   // the brute commits (hyperarmor) — it never aborts a slam
+
+        public void StartAttack()
+        {
+            // The slam strike lands at the telegraphed point (instant); recovery is the Recover phase.
+            if (_telegraph != null) _telegraph.SetActive(false);   // telegraph clears at the moment of impact
+            if (_player != null && _playerDmg != null && _playerDmg.IsAlive)
             {
-                _slamHitPending = false;
-                if (_telegraph != null) _telegraph.SetActive(false);   // telegraph clears at the moment of impact
-
-                if (_player != null && _playerDmg != null && _playerDmg.IsAlive)
-                {
-                    Vector3 d = _player.position - _slamPoint; d.y = 0f;
-                    if (d.magnitude <= data.slamRadius) _playerDmg.TakeDamage(data.slamDamage, transform.position, data.guardBreaks);
-                }
-                PlayerCameraRig.Shake(slamShake.x, slamShake.y);
+                Vector3 d = _player.position - _slamPoint; d.y = 0f;
+                if (d.magnitude <= data.slamRadius) _playerDmg.TakeDamage(data.slamDamage, transform.position, data.guardBreaks);
             }
+            PlayerCameraRig.Shake(slamShake.x, slamShake.y);
+        }
 
-            if (_slamTimer <= 0f)
+        public bool TickAttack(float dt) => true;   // the slam strike is instant
+
+        public void StartRecover() => _phaseTimer = data.slamRecovery;
+
+        public bool TickRecover(float dt)
+        {
+            AnimStop(dt);
+            _phaseTimer -= dt;
+            if (_phaseTimer <= 0f) { _cdTimer = data.slamCooldown; _slamming = false; return true; }
+            return false;
+        }
+
+        // ---------------- helpers ----------------
+        private float PlanarDist()
+        {
+            Vector3 d = _player.position - transform.position; d.y = 0f;
+            return d.magnitude;
+        }
+
+        private void FaceTowardPlayer(float dt)
+        {
+            Vector3 to = _player.position - transform.position; to.y = 0f;
+            if (to.sqrMagnitude > 0.01f)
             {
-                _slamming = false;
-                _cdTimer = data.slamCooldown;
-                if (_telegraph != null) _telegraph.SetActive(false);
+                Quaternion target = Quaternion.LookRotation(to);
+                modelRoot.rotation = Quaternion.RotateTowards(modelRoot.rotation, target, data.turnSpeedDeg * dt);
             }
+        }
+
+        private void SetAnimSpeed(float value, float damp, float dt) { if (animator != null) animator.SetFloat(AnimSpeed, value, damp, dt); }
+        private void AnimStop(float dt) { if (animator != null) animator.SetFloat(AnimSpeed, 0f, animDampStop, dt); }
+
+        private void TickKnockback(float dt)
+        {
+            if (_knockback.sqrMagnitude > 0.0001f)
+            {
+                transform.position += _knockback * dt;
+                _knockback = Vector3.Lerp(_knockback, Vector3.zero, 1f - Mathf.Exp(-knockbackDecayRate * dt));
+            }
+        }
+
+        private void TickDying(float dt)
+        {
+            if (_knockback.sqrMagnitude > 0.0001f)   // ride the death knockback while the body falls
+            {
+                transform.position += _knockback * dt;
+                _knockback = Vector3.Lerp(_knockback, Vector3.zero, 1f - Mathf.Exp(-knockbackDecayRate * dt));
+            }
+            _deathTimer -= dt;
+            if (_deathTimer <= 0f) { _dying = false; _return?.Invoke(this); }
         }
 
         /// <summary>Push-away from nearby enemies + the player so the crowd spaces out (kinematic).</summary>
