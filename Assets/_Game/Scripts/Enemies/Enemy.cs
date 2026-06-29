@@ -58,6 +58,8 @@ namespace Hordebreakers
         [SerializeField] private float strafeSpeedAggressionScale = 0.35f;
         [Tooltip("Wind-up aborts (rusher) if the player escapes past standoff * this during the telegraph.")]
         [SerializeField] private float telegraphAbortReachMult = 1.5f;
+        [Tooltip("Charger: between charges it backs off to chargeStartRange * this, so the next charge is a real run-up instead of a point-blank tap.")]
+        [SerializeField] private float chargerHoldFraction = 0.8f;
 
         [Header("Animator blend (Speed param value + damping time)")]
         [Tooltip("Speed param while approaching the ring, and its blend damping time.")]
@@ -255,7 +257,8 @@ namespace Hordebreakers
         public void RepositionStep(float dt)
         {
             if (_staggerTimer > 0f) { AnimStop(dt); return; }
-            if (_data.archetype != AttackArchetype.StandoffLunge) { ApproachStep(dt); return; }   // charger keeps rushing; dummy idles
+            if (_data.archetype == AttackArchetype.Charger) { ChargerReposition(dt); return; }   // back off to charge range, not point-blank
+            if (_data.archetype != AttackArchetype.StandoffLunge) { ApproachStep(dt); return; }   // dummy idles
 
             Vector3 fromPlayer = transform.position - _player.position; fromPlayer.y = 0f;
             float dist = fromPlayer.magnitude;
@@ -408,6 +411,20 @@ namespace Hordebreakers
             FaceTowardPlayer(dt);
             if (dist > 0.05f) transform.position += (to / dist) * _data.moveSpeed * dt;
             SetAnimSpeed(animSpeedApproach, animDampApproach, dt);
+        }
+
+        // Charger between charges: back off to charge range (eyeing the player) so the next charge is a real run-up.
+        private void ChargerReposition(float dt)
+        {
+            FaceTowardPlayer(dt);
+            float hold = _data.chargeStartRange * chargerHoldFraction;
+            if (PlanarDist() < hold)
+            {
+                Vector3 away = transform.position - _player.position; away.y = 0f;
+                if (away.sqrMagnitude > 0.01f) transform.position += away.normalized * _data.moveSpeed * dt;
+                SetAnimSpeed(animSpeedApproach, animDampApproach, dt);
+            }
+            else AnimStop(dt);   // at range → hold until off cooldown, then charge
         }
 
         /// <summary>Hard depenetration from the player's body — kinematic enemies can't be pushed by the player's CharacterController, so we keep ourselves out of it.</summary>
