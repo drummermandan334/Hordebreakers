@@ -39,6 +39,10 @@ namespace Hordebreakers
         [Header("Attack pattern (telegraphed lunge)")]
         [Tooltip("Standoff distance the enemy holds at, ringing the player instead of piling on.")]
         public float attackRange = 1.8f;
+        [Tooltip("StandoffLunge only: the enemy approaches/holds/strafes at the standoff ring x this (engagement ring). Wider = the crowd spreads out into a bigger circle (less clustered for an AoE) and darts in to strike. Keep <= ~2 so the lunge still reaches across.")]
+        public float holdRingMult = 1.6f;
+        [Tooltip("StandoffLunge only: at most this many can be mid-attack (telegraph->lunge) at once across the whole arena; the rest keep orbiting until a slot frees. The biggest anti-swarm lever — turns the face-pile into an encirclement.")]
+        public int maxSimultaneousAttackers = 3;
         [Tooltip("Telegraph time before the lunge — the dodge window.")]
         public float attackWindup = 0.45f;
         [Tooltip("Recovery after the lunge before it can move/attack again.")]

@@ -158,7 +158,7 @@ namespace Hordebreakers
         private void FsmSeek(float dt)
         {
             if (!InAttackRange) { ApproachStep(dt); return; }
-            if (OffCooldown) { StartTelegraph(); _state = State.Windup; return; }
+            if (OffCooldown && TryStartTelegraph()) { _state = State.Windup; return; }
             RepositionStep(dt);
         }
 
@@ -194,7 +194,7 @@ namespace Hordebreakers
 
         public void RepositionStep(float dt) => ApproachStep(dt);   // brute doesn't strafe — keep closing in
 
-        public void StartTelegraph()
+        public bool TryStartTelegraph()
         {
             _slamming = true;
             _slamPoint = _player.position;   // locked here — dodge out of this spot during the wind-up
@@ -213,6 +213,7 @@ namespace Hordebreakers
                 _telegraph.transform.localScale = new Vector3(data.slamRadius * 2f, 0.05f, data.slamRadius * 2f);
                 _telegraph.SetActive(true);
             }
+            return true;   // the brute (boss) is never capped — it always commits to a slam
         }
 
         public void CancelTelegraph()

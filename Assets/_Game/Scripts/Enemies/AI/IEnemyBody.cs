@@ -20,7 +20,7 @@ namespace Hordebreakers
         void RepositionStep(float dt);     // in range but cooling: strafe / hold / keep closing
 
         // --- attack sequence (telegraph -> commit -> recover); the body owns the timers + hit application ---
-        void StartTelegraph();             // begin the wind-up tell (anim + glow), arm the wind-up timer
+        bool TryStartTelegraph();          // try to claim an attacker slot + begin the wind-up tell; false = denied (cap full) -> orbit instead
         void CancelTelegraph();            // interrupt the tell (player escaped, or we got hit)
         bool TickTelegraph(float dt);      // true when the wind-up is done (faces the player during it)
         bool TelegraphShouldAbort { get; } // player left the commit window mid-wind-up (archetype-defined)

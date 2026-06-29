@@ -10,21 +10,21 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a5feaae11790392488c043871db5efda, type: 3}
-  m_Name: BruteData
-  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.EliteData
-  maxHp: 120
+  m_Name: CommanderData
+  m_EditorClassIdentifier: Hordebreakers::Hordebreakers.EliteData
+  maxHp: 600
   moveSpeed: 2
   turnSpeedDeg: 200
-  separationRadius: 1.1
+  separationRadius: 1.4
   separationForce: 6
   guardBreaks: 1
-  slamRange: 3.5
-  slamRadius: 3.5
-  slamDamage: 22
+  slamRange: 4
+  slamRadius: 4
+  slamDamage: 28
   slamWindup: 1.1
   slamRecovery: 0.8
   slamCooldown: 2.5
-  hitReactTime: 0.12
-  deathDuration: 1.6
-  deathKnockback: 10
-  xpValue: 12
+  hitReactTime: 0.3
+  deathDuration: 2
+  deathKnockback: 6
+  xpValue: 40

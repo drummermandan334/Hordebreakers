@@ -56,8 +56,6 @@ namespace Hordebreakers
         [Tooltip("Strafe (circle) speed fraction = base + aggressionScale * (1 - aggression). Cautious enemies circle more.")]
         [SerializeField] private float strafeSpeedBase = 0.3f;
         [SerializeField] private float strafeSpeedAggressionScale = 0.35f;
-        [Tooltip("Reach multiplier for the lunge-connect check (player must be within standoff * this).")]
-        [SerializeField] private float lungeConnectReachMult = 1.25f;
         [Tooltip("Wind-up aborts (rusher) if the player escapes past standoff * this during the telegraph.")]
         [SerializeField] private float telegraphAbortReachMult = 1.5f;
 
@@ -97,8 +95,13 @@ namespace Hordebreakers
         private Vector3 _lungeDir;
         private Vector3 _knockback;    // hit-recoil impulse
         private float _staggerTimer;   // > 0 while flinching from a hit (movement paused)
+        private bool _hasAttackToken;  // true while this rusher holds one of the shared attacker slots
         private int _separationMask;   // enemy + player layers, for crowd separation
         private static readonly Collider[] _sepHits = new Collider[16];
+        private static int _activeAttackers;   // shared budget: how many StandoffLunge rushers are mid-attack right now (the attacker-cap)
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetAttackerBudget() => _activeAttackers = 0;   // statics survive fast-enter-playmode; reset each run
 
         private static readonly int AnimSpeed = Animator.StringToHash("Speed");
         private static readonly int AnimDead = Animator.StringToHash("Dead");
@@ -186,11 +189,13 @@ namespace Hordebreakers
             ClampOutOfPlayer();
         }
 
+        private void OnDisable() => ReleaseAttackToken();   // pooled/despawned mid-attack → free the slot
+
         // ---------------- FSM brain (thin orchestration over the IEnemyBody verbs) ----------------
         private void FsmSeek(float dt)
         {
             if (!InAttackRange) { ApproachStep(dt); return; }
-            if (OffCooldown) { StartTelegraph(); _state = State.Windup; return; }
+            if (OffCooldown && TryStartTelegraph()) { _state = State.Windup; return; }
             RepositionStep(dt);
         }
 
@@ -219,11 +224,12 @@ namespace Hordebreakers
                 if (_data.archetype == AttackArchetype.Dummy) return false;   // dummies never attack
                 float dist = PlanarDist();
                 if (_data.archetype == AttackArchetype.Charger) return dist <= _data.chargeStartRange;
-                return dist <= _standoff + ringApproachBuffer;
+                return dist <= HoldRing + ringApproachBuffer;
             }
         }
 
-        public bool OffCooldown => _cooldownTimer <= 0f;
+        public bool OffCooldown => _cooldownTimer <= 0f
+            && (_data.archetype != AttackArchetype.StandoffLunge || _activeAttackers < _data.maxSimultaneousAttackers);   // rusher also needs a free attacker slot
 
         public void ApproachStep(float dt)
         {
@@ -238,7 +244,7 @@ namespace Hordebreakers
 
             // approach the standoff ring, nudged to this enemy's slot so the crowd fans out
             Vector3 ringDir = Quaternion.Euler(0f, _slotOffset, 0f) * dirFromPlayer;
-            Vector3 ringTarget = _player.position + ringDir * _standoff;
+            Vector3 ringTarget = _player.position + ringDir * HoldRing;
             Vector3 toTarget = ringTarget - transform.position; toTarget.y = 0f;
             Vector3 step = toTarget.normalized * _data.moveSpeed * dt;
             if (step.sqrMagnitude > toTarget.sqrMagnitude) step = toTarget;
@@ -257,23 +263,37 @@ namespace Hordebreakers
             FaceTowardPlayer(dt);
 
             Vector3 tangent = Vector3.Cross(Vector3.up, dirFromPlayer) * _strafeDir;
-            Vector3 radialFix = dirFromPlayer * (_standoff - dist) * ringHoldStrength;   // hold the ring distance
+            Vector3 radialFix = dirFromPlayer * (HoldRing - dist) * ringHoldStrength;   // hold the (wider) ring distance
             float strafe = strafeSpeedBase + strafeSpeedAggressionScale * (1f - _aggression);   // cautious enemies circle more
             transform.position += (tangent * _data.moveSpeed * strafe + radialFix) * dt;
             SetAnimSpeed(animSpeedStrafe, animDampStrafe, dt);
         }
 
-        public void StartTelegraph()
+        public bool TryStartTelegraph()
         {
+            // Rusher: claim a shared attacker slot; deny (orbit) if the cap is full. Charger/others aren't capped.
+            if (_data.archetype == AttackArchetype.StandoffLunge)
+            {
+                if (_activeAttackers >= _data.maxSimultaneousAttackers) return false;
+                _activeAttackers++;
+                _hasAttackToken = true;
+            }
             float windup = _data.archetype == AttackArchetype.Charger ? _data.chargeWindup : _data.attackWindup;
             _stateTimer = windup;
             if (animator != null) animator.SetTrigger(AnimAttack);
             if (attackTelegraph != null) attackTelegraph.Begin(windup);
+            return true;
+        }
+
+        private void ReleaseAttackToken()
+        {
+            if (_hasAttackToken) { _activeAttackers = Mathf.Max(0, _activeAttackers - 1); _hasAttackToken = false; }
         }
 
         public void CancelTelegraph()
         {
             if (attackTelegraph != null) attackTelegraph.Cancel();
+            ReleaseAttackToken();   // aborted wind-up frees the slot
         }
 
         public bool TickTelegraph(float dt)
@@ -306,30 +326,23 @@ namespace Hordebreakers
             float speed = charger ? _data.chargeSpeed : _data.lungeSpeed;
             transform.position += _lungeDir * speed * dt;
 
-            // Charger: sweep-connect mid-dash (a fast charge passes THROUGH the player, so don't only check the end).
-            if (charger && _playerDmg != null && _playerDmg.IsAlive)
+            // Connect on ACTUAL contact: the dash darts toward the locked direction and hits only when it reaches the
+            // player (a readable, dodgeable strike — NOT a hit from a couple metres away). It whiffs if the player got
+            // out of the way. lungeTime/chargeTime is the max travel window before the strike gives up.
+            if (_playerDmg != null && _playerDmg.IsAlive)
             {
                 Vector3 toP = _player.position - transform.position; toP.y = 0f;
-                if (toP.magnitude <= _data.chargeHitRadius)
+                float hitRadius = charger ? _data.chargeHitRadius : _data.contactRange;
+                if (toP.magnitude <= hitRadius)
                 {
-                    _playerDmg.TakeDamage(_data.chargeDamage, transform.position, _data.guardBreaks);
-                    return true;   // charge connected → done
+                    float dmg = charger ? _data.chargeDamage : _data.contactDamage;
+                    _playerDmg.TakeDamage(dmg, transform.position, _data.guardBreaks);
+                    return true;   // connected → done
                 }
             }
 
             _stateTimer -= dt;
-            if (_stateTimer <= 0f)
-            {
-                // Standoff lunge connects if the player is still in front and within reach (charger already swept above).
-                if (!charger && _playerDmg != null && _playerDmg.IsAlive)
-                {
-                    Vector3 to = _player.position - transform.position; to.y = 0f;
-                    if (to.magnitude <= _standoff * lungeConnectReachMult)
-                        _playerDmg.TakeDamage(_data.contactDamage, transform.position, _data.guardBreaks);
-                }
-                return true;   // done
-            }
-            return false;
+            return _stateTimer <= 0f;   // travel window over → done (whiffed if it never reached the player)
         }
 
         public void StartRecover()
@@ -341,7 +354,7 @@ namespace Hordebreakers
         {
             AnimStop(dt);
             _stateTimer -= dt;
-            if (_stateTimer <= 0f) { _cooldownTimer = _attackCd; return true; }
+            if (_stateTimer <= 0f) { _cooldownTimer = _attackCd; ReleaseAttackToken(); return true; }
             return false;
         }
 
@@ -351,6 +364,9 @@ namespace Hordebreakers
             Vector3 d = _player.position - transform.position; d.y = 0f;
             return d.magnitude;
         }
+
+        /// <summary>The engagement/strafe ring (StandoffLunge): the tight standoff distance widened by holdRingMult so the crowd circles in a bigger ring. The lunge-connect stays based on the tight _standoff.</summary>
+        private float HoldRing => _standoff * (_data != null ? _data.holdRingMult : 1f);
 
         private void FaceTowardPlayer(float dt)
         {
@@ -460,12 +476,14 @@ namespace Hordebreakers
                 animator.SetInteger(AnimHitDir, dir);
                 animator.SetTrigger(AnimHit);
             }
+            ReleaseAttackToken();                 // a hit interrupts the attack → free the slot
             _staggerTimer = _data.hitReactTime;   // pauses both brains' actions (FSM stagger-gate; BT nodes yield on IsStaggered)
             _state = State.Seek;                  // a hit cancels a wind-up / lunge (FSM)
         }
 
         private void Die()
         {
+            ReleaseAttackToken();   // free the slot if killed mid-attack
             _active = false;
             _dying = true;
             _deathTimer = _data != null ? _data.deathDuration : fallbackDeathDuration;

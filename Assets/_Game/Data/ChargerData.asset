@@ -14,14 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.EnemyData
   archetype: 1
   maxHp: 28
-  moveSpeed: 4.6
+  moveSpeed: 3.4
+  turnSpeedDeg: 540
   separationRadius: 0.7
   separationForce: 6
+  playerSpacing: 0.6
   guardBreaks: 1
   contactDamage: 5
   contactInterval: 1
   contactRange: 1.4
   attackRange: 1.8
+  holdRingMult: 1.6
   attackWindup: 0.45
   attackRecovery: 0.45
   attackCooldown: 1.8
@@ -31,11 +34,12 @@ MonoBehaviour:
   chargeWindup: 0.7
   chargeSpeed: 16
   chargeTime: 0.55
-  chargeDamage: 14
+  chargeDamage: 9
   chargeRecovery: 0.9
   chargeHitRadius: 1.3
   knockback: 2.5
   knockbackPerDamage: 0.3
+  deathKnockback: 16
   hitReactTime: 0.12
   deathDuration: 1.1
-  xpValue: 3
+  xpValue: 4

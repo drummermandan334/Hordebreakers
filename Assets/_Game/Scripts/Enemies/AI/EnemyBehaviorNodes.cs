@@ -79,7 +79,7 @@ namespace Hordebreakers
         {
             _body = GameObject != null ? GameObject.GetComponent<IEnemyBody>() : null;
             if (_body == null) return Status.Failure;
-            _body.StartTelegraph();
+            if (!_body.TryStartTelegraph()) return Status.Failure;   // attacker-cap full → bail so the enemy keeps orbiting
             return Status.Running;
         }
         protected override Status OnUpdate()
