@@ -59,6 +59,11 @@ namespace Hordebreakers
         [Range(0f, 1f)]
         [SerializeField] private float dodgeVolume = 1f;
 
+        [Header("Land — touchdown thud after a fall (NOT a footstep)")]
+        [SerializeField] private AudioClip[] landClips;
+        [Range(0f, 1f)]
+        [SerializeField] private float landVolume = 1f;
+
         private AudioSource[] _hitPool;
         private int _next;
         private AudioSource[] _spellPool;
@@ -159,6 +164,15 @@ namespace Hordebreakers
             AudioClip clip = Instance.Pick(Instance.dodgeClips);
             if (clip == null) return;
             Instance.PlaySpellVoice(clip, position, Instance.dodgeVolume, Instance.defaultPitchVariance, 0f);
+        }
+
+        /// <summary>Landing thud after a fall — its own clip set (distinct from a footstep or the roll whoosh).</summary>
+        public static void PlayLand(Vector3 position)
+        {
+            if (Instance == null) return;
+            AudioClip clip = Instance.Pick(Instance.landClips);
+            if (clip == null) return;
+            Instance.PlaySpellVoice(clip, position, Instance.landVolume, Instance.defaultPitchVariance, 0f);
         }
 
         private void PlaySpellVoice(AudioClip clip, Vector3 position, float volume, float pitchVariance, float startTime)

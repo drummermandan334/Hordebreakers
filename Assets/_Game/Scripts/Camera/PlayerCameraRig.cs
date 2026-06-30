@@ -52,22 +52,43 @@ namespace Hordebreakers
         [SerializeField] private bool enableShake = true;
         [Tooltip("Scales the legacy Shake(amount, ..) value into impulse velocity (tune to match the old feel).")]
         [SerializeField] private float shakeForceScale = 8f;
+        [Range(0f, 1f)]
+        [Tooltip("Directional Shake: how much of the kick follows the passed world direction (rest is random spread so it isn't a clean push).")]
+        [SerializeField] private float shakeDirectionalBias = 0.75f;
+        [Tooltip("Directional Shake: random spread added on top of the biased direction.")]
+        [SerializeField] private float shakeRandomSpread = 0.35f;
+
+        [Header("FOV (dynamic kicks — punch on dodge / heavy / finisher / musou; widen on sprint)")]
+        [Tooltip("Resting field of view. Auto-initialized from the camera lens in Awake.")]
+        [SerializeField] private float baseFov = 50f;
+        [Tooltip("Sustained FOV added while sprinting.")]
+        [SerializeField] private float sprintFovAdd = 6f;
+        [Tooltip("How fast a transient FOV kick relaxes back to rest.")]
+        [SerializeField] private float fovKickDecay = 4f;
+        [Tooltip("Exponential ease rate of the lens toward the target FOV.")]
+        [SerializeField] private float fovBlendSpeed = 8f;
 
         public static PlayerCameraRig Instance { get; private set; }
 
         private CinemachineOrbitalFollow _orbit;
         private CinemachineImpulseSource _impulse;
+        private CinemachineCamera _cam;    // lens owner on this GameObject — FOV kicks write _cam.Lens.FieldOfView
         private Transform _target;
         private Vector3 _lastTargetPos;
         private float _headingYaw;
         private bool _hasHeading;
         private bool _followMode = true;   // true = stay behind the character (follow); false = manual hold
+        private float _fovKick;            // transient additive FOV (dodge/heavy/finisher/musou/kill); decays on its own
+        private float _sprintFov;          // eased sustained additive FOV (sprint)
+        private bool _sprintFovOn;         // sprint widen target, set each frame by SetSprintFov
 
         private void Awake()
         {
             Instance = this;
             _orbit = GetComponent<CinemachineOrbitalFollow>();
             _impulse = GetComponent<CinemachineImpulseSource>();
+            _cam = GetComponent<CinemachineCamera>();
+            if (_cam != null) baseFov = _cam.Lens.FieldOfView;   // respect the authored FOV as the resting value
         }
 
         private void OnDestroy() { if (Instance == this) Instance = null; }
@@ -167,6 +188,25 @@ namespace Hordebreakers
 
             _orbit.HorizontalAxis.Value = Mathf.Repeat(yaw + 180f, 360f) - 180f;   // keep within the wrapped -180..180 range
             _orbit.VerticalAxis.Value = pitch;
+
+            DriveFov();
+        }
+
+        /// <summary>Ease the lens FOV toward base + transient kick + sustained sprint widen. Unscaled so it keeps
+        /// breathing through hit-stop / slow-mo (which scale Time.deltaTime). The Lens is a struct — read, edit, assign back.</summary>
+        private void DriveFov()
+        {
+            if (_cam == null) return;
+            float dt = Time.unscaledDeltaTime;
+            if (_fovKick > 0.01f) _fovKick = Mathf.MoveTowards(_fovKick, 0f, fovKickDecay * dt * Mathf.Max(1f, _fovKick));
+            else _fovKick = 0f;
+            _sprintFov = Mathf.MoveTowards(_sprintFov, _sprintFovOn ? sprintFovAdd : 0f, fovBlendSpeed * dt * Mathf.Max(1f, sprintFovAdd));
+            _sprintFovOn = false;   // consumed each frame; SetSprintFov re-asserts it while held
+
+            float targetFov = baseFov + _fovKick + _sprintFov;
+            LensSettings lens = _cam.Lens;
+            lens.FieldOfView = Mathf.Lerp(lens.FieldOfView, targetFov, 1f - Mathf.Exp(-fovBlendSpeed * dt));
+            _cam.Lens = lens;
         }
 
         /// <summary>
@@ -179,6 +219,36 @@ namespace Hordebreakers
             CinemachineImpulseDefinition def = Instance._impulse.ImpulseDefinition;
             if (def != null) def.ImpulseDuration = Mathf.Max(0.05f, duration);
             Instance._impulse.GenerateImpulseWithVelocity(Random.insideUnitSphere * (amount * Instance.shakeForceScale));
+        }
+
+        /// <summary>
+        /// Directional screen-shake: biases the impulse velocity along <paramref name="worldDir"/> (e.g. away from a hit
+        /// source, or along the swing) so the kick reads as coming FROM the threat, with a small random spread kept so it
+        /// isn't a clean push. The visible on-screen axis is still filtered by the impulse listener — this is a tendency,
+        /// not an exact axis. Falls back to a uniform shake when no direction is given.
+        /// </summary>
+        public static void Shake(float amount, float duration, Vector3 worldDir)
+        {
+            if (Instance == null || Instance._impulse == null || !Instance.enableShake) return;
+            CinemachineImpulseDefinition def = Instance._impulse.ImpulseDefinition;
+            if (def != null) def.ImpulseDuration = Mathf.Max(0.05f, duration);
+            Vector3 dir = worldDir.sqrMagnitude > 0.0001f ? worldDir.normalized : Random.insideUnitSphere;
+            Vector3 vel = (dir * Instance.shakeDirectionalBias + Random.insideUnitSphere * Instance.shakeRandomSpread) * (amount * Instance.shakeForceScale);
+            Instance._impulse.GenerateImpulseWithVelocity(vel);
+        }
+
+        /// <summary>Transient additive FOV punch (dodge / heavy / finisher / musou / kill). Takes the max so overlapping
+        /// kicks don't cancel; decays on its own in <see cref="DriveFov"/>.</summary>
+        public static void FovKick(float amount)
+        {
+            if (Instance != null) Instance._fovKick = Mathf.Max(Instance._fovKick, amount);
+        }
+
+        /// <summary>Sustained sprint FOV widen — call every frame sprint is held (the widen eases out on its own
+        /// once the calls stop). One-line call from the player's locomotion branch.</summary>
+        public static void SetSprintFov(bool sprinting)
+        {
+            if (Instance != null) Instance._sprintFovOn = sprinting;
         }
     }
 }

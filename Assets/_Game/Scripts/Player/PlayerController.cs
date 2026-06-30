@@ -131,6 +131,12 @@ namespace Hordebreakers
         private float _castCdTimer;
         private Transform _leftHand;           // Hand_L bone — the bolt's spawn point
         private float _verticalVel;
+        private Vector3 _planarVel;            // smoothed horizontal LOCOMOTION velocity (momentum). Dodge/attack/musou bypass this and re-sync it so momentum resumes from real speed.
+        private bool _isSprinting;             // sprint speed-state (strong stick / hold key); feeds top speed, the Speed param, and the camera FOV widen
+        private float _airTime;                // seconds since leaving the ground (0 while grounded) — scales landing FX
+        private float _coyoteTimer;            // > 0 for a grace window after walking off a ledge — a jump press still fires
+        private float _jumpBufferTimer;        // > 0 after a jump press while airborne — fires on the next touchdown
+        private bool _wasGrounded = true;      // last frame's grounded, to detect the touchdown edge for landing FX
         private bool _grounded;
         private int _gripLayer = -1;       // "RightHandGrip" override layer; held off during attacks
         private int _armLayer = -1;        // "SwordArm" ready-stance layer; held off during attacks
@@ -219,6 +225,7 @@ namespace Hordebreakers
         {
             if (amount <= 0f) return;
             _hp = Mathf.Min(_hp + amount, data.maxHp);
+            PostFxDirector.SetHealthFraction(HealthNormalized);   // ease the low-HP framing back out as health returns
         }
 
         /// <summary>Re-enable + reset the player at a checkpoint after death (arena respawn): full HP, repositioned,
@@ -231,6 +238,8 @@ namespace Hordebreakers
             if (_cc != null) { _cc.enabled = false; transform.position = position; _cc.enabled = true; }   // CC won't fight a teleport while disabled
             else transform.position = position;
             _verticalVel = 0f;
+            _planarVel = Vector3.zero; _isSprinting = false;
+            _airTime = 0f; _coyoteTimer = 0f; _jumpBufferTimer = 0f; _wasGrounded = true;
             _musou = 0f; _musouActive = false; _musouTimer = 0f;
             _dodgeTimer = 0f; _iFrameTimer = 0f; _dodgeCdTimer = 0f; _dodgeCharges = Mathf.Max(1, data.dodgeMaxCharges);
             _blocking = false; _guardBreakTimer = 0f;
@@ -238,6 +247,7 @@ namespace Hordebreakers
             _bufferedAttack = 0; _bufferedDodge = false; _comboStep = 0;
             _castSwing = false; _swingHitResolved = false; _nextSwingTime = 0f;
             _hitReactCdTimer = 0f; _lastAttackStateHash = 0;
+            PostFxDirector.MusouGrade(false); PostFxDirector.SetHealthFraction(1f);   // clear any lingering ult grade / low-HP framing on respawn
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
         }
 
@@ -255,6 +265,7 @@ namespace Hordebreakers
             if (_dodgeTimer > 0f)
             {
                 SetAnimSpeed(0f, dt);
+                _planarVel = _dodgeDir * data.dodgeSpeed;   // keep momentum in sync so locomotion resumes from the dash speed (no dead-stop on exit)
                 MoveWithVertical(_dodgeDir * data.dodgeSpeed, dt);
                 return;
             }
@@ -263,12 +274,28 @@ namespace Hordebreakers
             if (_guardBreakTimer > 0f)
             {
                 SetAnimSpeed(0f, dt);
+                _planarVel = Vector3.zero;
                 MoveWithVertical(Vector3.zero, dt);
                 return;
             }
 
             _grounded = _cc.isGrounded;
             if (animator != null) animator.SetBool(AnimGrounded, _grounded);
+
+            // --- airtime / coyote / landing touchdown edge ---
+            if (_grounded)
+            {
+                if (!_wasGrounded) OnLanded(_airTime);   // touchdown → fire a buffered jump or landing FX scaled by airtime
+                _airTime = 0f;
+                _coyoteTimer = data.coyoteTime;          // refresh the grace each grounded frame
+            }
+            else
+            {
+                _airTime += dt;
+                if (_coyoteTimer > 0f) _coyoteTimer -= dt;
+            }
+            _wasGrounded = _grounded;
+            if (_jumpBufferTimer > 0f) _jumpBufferTimer -= dt;
 
             HandleLockInput();   // acquire / drop / switch the focus target before movement reads it
             bool locked = TargetLock.Instance != null && TargetLock.Instance.HasTarget;
@@ -343,7 +370,9 @@ namespace Hordebreakers
                 // Committed to a swing: the attack's forward lunge drives movement and OVERRIDES move input;
                 // the player only gets a slight steer (no free gliding mid-attack).
                 Vector3 momentum = _attackStepTimer > 0f ? _attackVel : Vector3.zero;
-                MoveWithVertical(momentum + moveDir * data.attackSteerSpeed, dt);
+                Vector3 attackVel = momentum + moveDir * data.attackSteerSpeed;
+                _planarVel = attackVel;   // sync momentum so stepping out of the swing into locomotion carries the real speed
+                MoveWithVertical(attackVel, dt);
                 SetAnimSpeed(0f, dt);
             }
             else if (IsBaseInDodge())
@@ -352,24 +381,33 @@ namespace Hordebreakers
                 // direction — same _dodgeDir * dodgeSpeed as the dash — so the WHOLE roll moves at one constant rate
                 // instead of front-loading the dive and going stationary. No steering/facing (committed); action input
                 // was already processed above, so you can still cancel out of the roll.
+                _planarVel = _dodgeDir * data.dodgeSpeed;   // keep momentum synced through the roll tail
                 MoveWithVertical(_dodgeDir * data.dodgeSpeed, dt);
                 SetAnimSpeed(0f, dt);
             }
             else if (_blocking)
             {
                 _comboStep = 0;
-                float bctrl = data.blockMoveSpeedMult;                             // blocking slows you — not a free turtle
-                MoveWithVertical(moveDir * data.moveSpeed * bctrl, dt);
+                _isSprinting = false;                                             // no sprinting behind a raised guard
+                float bctrl = data.blockMoveSpeedMult;                            // blocking slows you — not a free turtle
+                Vector3 smoothed = SmoothLocomotion(moveDir * data.moveSpeed * bctrl, _grounded, dt);
+                MoveWithVertical(smoothed, dt);
                 if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
-                SetAnimSpeed(moveDir.magnitude * bctrl, dt);
+                SetAnimSpeed(smoothed.magnitude / Mathf.Max(0.01f, data.moveSpeed), dt);
             }
             else
             {
                 _comboStep = 0;                                                    // back to locomotion: combo resets
+                UpdateSprint(moveDir);
+                float top = _isSprinting ? data.sprintSpeed : data.moveSpeed;
                 float ctrl = _grounded ? 1f : airControl;
-                MoveWithVertical(moveDir * data.moveSpeed * ctrl, dt);
-                if (locked) FaceDir(lockDir, dt); else if (moveDir.sqrMagnitude > 0.01f) FaceDir(moveDir, dt);
-                SetAnimSpeed(moveDir.magnitude, dt);
+                Vector3 smoothed = SmoothLocomotion(moveDir * top * ctrl, _grounded, dt);   // momentum/weight (locomotion only)
+                MoveWithVertical(smoothed, dt);
+                // Face the SMOOTHED velocity so turns lag slightly behind input — adds weight. (Locked: face the target.)
+                if (locked) FaceDir(lockDir, dt); else if (smoothed.sqrMagnitude > 0.01f) FaceDir(smoothed, dt);
+                // Speed param tracks ACTUAL smoothed speed (normalized to walk), so sprint pushes the blend past 1 for a run state.
+                SetAnimSpeed(smoothed.magnitude / Mathf.Max(0.01f, data.moveSpeed), dt);
+                PlayerCameraRig.SetSprintFov(_isSprinting);
             }
 
             if (_blockLayer >= 0)   // fade the upper-body guard pose in/out as you raise/drop the block
@@ -494,8 +532,10 @@ namespace Hordebreakers
             {
                 if (_hits[i].TryGetComponent(out IDamageable d) && d.IsAlive) d.TakeDamage(data.musouDamage, origin);
             }
-            PlayerCameraRig.Shake(finisherShake.x * 5f, finisherShake.y * 2.5f);   // big ultimate jolt
-            if (GameManager.Instance != null) GameManager.Instance.HitStop(finisherHitStop.x, finisherHitStop.y);
+            PlayerCameraRig.Shake(finisherShake.x * 5f, finisherShake.y * 2.5f, Vector3.up);   // big ultimate ground-slam jolt
+            PlayerCameraRig.FovKick(10f);                                          // wide FOV punch for the screen-clear
+            PostFxDirector.MusouGrade(true);                                       // color grade in for the duration of the ult
+            if (GameManager.Instance != null) GameManager.Instance.HitStop(0.25f, 0.35f);   // longer, milder slow-mo (routed through the sole timeScale arbiter)
             CombatAudio.PlayMusou(origin);
             if (musouVfx != null)
             {
@@ -508,9 +548,10 @@ namespace Hordebreakers
         private void TickMusou(float dt)
         {
             SetAnimSpeed(0f, dt);
+            _planarVel = Vector3.zero;
             MoveWithVertical(Vector3.zero, dt);   // rooted + committed; gravity still resolves
             _musouTimer -= dt;
-            if (_musouTimer <= 0f) _musouActive = false;
+            if (_musouTimer <= 0f) { _musouActive = false; PostFxDirector.MusouGrade(false); }   // ease the color grade back out
         }
 
         private void GainMusou(float amount)
@@ -570,7 +611,11 @@ namespace Hordebreakers
                 else if (inAttack) _bufferedDodge = true;   // committed in the active frames — queue; fires the instant recovery opens
                 // (pressed while free but simply out of charges: dropped, never queued — no phantom dodge a second later)
             }
-            if (jump && _grounded && !inAttack) DoJump();                     // no jump-canceling a swing
+            if (jump && !inAttack)                                            // no jump-canceling a swing
+            {
+                if (_coyoteTimer > 0f) DoJump();                              // grounded OR within the coyote grace
+                else _jumpBufferTimer = data.jumpBuffer;                      // airborne → buffer; fires on the next touchdown
+            }
 
             if (light || heavy)
             {
@@ -615,11 +660,51 @@ namespace Hordebreakers
             _cc.Move(vel * dt);
         }
 
+        /// <summary>
+        /// Ease the cached planar velocity toward a LOCOMOTION target with asymmetric accel/decel — decel slower than
+        /// accel, so you slide to a stop (that asymmetry is the weight). Air uses one lazy rate so you can't fully
+        /// redirect mid-jump. Only locomotion/block call this; the snappy override states (dodge/attack/musou) bypass it
+        /// and re-sync <see cref="_planarVel"/> so momentum resumes from real speed instead of dead-stopping.
+        /// </summary>
+        private Vector3 SmoothLocomotion(Vector3 targetVel, bool grounded, float dt)
+        {
+            float rate;
+            if (!grounded) rate = data.airAccel;
+            else rate = targetVel.sqrMagnitude >= _planarVel.sqrMagnitude ? data.groundAccel : data.groundDecel;
+            _planarVel = Vector3.Lerp(_planarVel, targetVel, 1f - Mathf.Exp(-rate * dt));
+            return _planarVel;
+        }
+
+        /// <summary>Sprint engages on a strong analog push (gamepad) or a held sprint key (KBM LeftAlt — LeftShift is dodge,
+        /// LeftControl is camera orbit), while grounded with move input. Digital WASD reads as full deflection, so KBM
+        /// gates sprint behind the key to keep a walk option.</summary>
+        private void UpdateSprint(Vector3 moveDir)
+        {
+            if (!_grounded || moveDir.sqrMagnitude < 0.01f) { _isSprinting = false; return; }
+            Gamepad pad = Gamepad.current;
+            bool stickSprint = pad != null && pad.leftStick.ReadValue().magnitude >= data.sprintStickThreshold;
+            bool keySprint = Input.GetKey(KeyCode.LeftAlt);
+            _isSprinting = stickSprint || keySprint;
+        }
+
         private void DoJump()
         {
             _verticalVel = jumpSpeed;
             _grounded = false;
+            _coyoteTimer = 0f;   // consume the grace so you can't double-jump off the same ledge window
             if (animator != null) { animator.SetBool(AnimGrounded, false); animator.SetTrigger(AnimJump); }
+        }
+
+        /// <summary>Touchdown edge: fire a buffered jump if one was queued just before landing; otherwise play landing
+        /// feedback (camera dip + dust + thud) scaled 0..1 by how long we were airborne. Small hops stay silent.</summary>
+        private void OnLanded(float airTime)
+        {
+            if (_jumpBufferTimer > 0f) { _jumpBufferTimer = 0f; DoJump(); return; }   // buffered jump → leave again, skip land FX
+            if (airTime < data.landSoftAirTime) return;                               // small hops: no FX
+            float t = Mathf.InverseLerp(data.landSoftAirTime, data.landHardAirTime, airTime);   // 0..1 strength
+            PlayerCameraRig.Shake(hitShake.x * (0.4f + t), hitShake.y, Vector3.down);            // a downward thud
+            CombatVfx.Hit(transform.position, Vector3.up, t > 0.6f);                             // reuse pooled spark/dust at the feet; splash on a hard land
+            CombatAudio.PlayLand(transform.position);
         }
 
         private void FaceDir(Vector3 dir, float dt)
@@ -724,6 +809,8 @@ namespace Hordebreakers
             _iFrameTimer = data.dodgeIFrames;   // invulnerable from the roll's start for dodgeIFrames seconds (spans most of the roll now)
             modelRoot.rotation = Quaternion.LookRotation(_dodgeDir);
             CombatAudio.PlayDodge(transform.position);   // roll whoosh (its own clip set on CombatAudio — not a footstep)
+            PostFxDirector.DodgeBurst(1f);               // chromatic-aberration speed-burst
+            PlayerCameraRig.FovKick(4f);                 // brief FOV punch on the dash
             if (animator != null) animator.SetTrigger(AnimDodge);
         }
 
@@ -756,8 +843,8 @@ namespace Hordebreakers
         private void ResolveSwingHit()
         {
             _swingHitResolved = true;
-            int hits = MeleeHit(_pendingReach, _pendingDamage);
-            if (hits > 0 || (_pendingHeavy && _pendingFinisher)) HitJuice(_pendingFinisher);
+            int hits = MeleeHit(_pendingReach, _pendingDamage, out bool killed);
+            if (hits > 0 || (_pendingHeavy && _pendingFinisher)) HitJuice(_pendingFinisher, _pendingDamage, killed);
         }
 
         /// <summary>Fires the magical bolt from the left hand at the cast's contact phase (the mirrored L3 thrust).</summary>
@@ -773,19 +860,40 @@ namespace Hordebreakers
         }
 
         // ---------- FX / feedback ----------
-        /// <summary>Impact feedback on EVERY connect: camera shake + hit-stop (a small "connect" stop on lights, a big
-        /// weighty one on the finisher). Tune hitStop / finisherHitStop to taste — set hitStop to (0, 1) for no light stop.</summary>
-        private void HitJuice(bool finisher)
+        /// <summary>Impact feedback on EVERY connect: camera shake + hit-stop, both SCALED by the hit's damage so a heavy
+        /// reads heavier than a light (a small "connect" stop on lights, a big weighty one on the finisher). Shake is
+        /// directional (biased along the swing). A killing blow adds a distinct slow-mo + jolt via <see cref="KillConfirm"/>.
+        /// Tune hitStop / finisherHitStop to taste — set hitStop to (0, 1) for no light stop.</summary>
+        private void HitJuice(bool finisher, float damage, bool kill)
         {
+            // Scale relative to a light hit, clamped so a huge heavy doesn't lock the screen. Partial lerp keeps lights distinct.
+            float scale = Mathf.Clamp(damage / Mathf.Max(1f, data.lightDamage), 1f, data.hitStopDamageScaleMax);
             Vector2 shake = finisher ? finisherShake : hitShake;
             Vector2 stop = finisher ? finisherHitStop : hitStop;
-            PlayerCameraRig.Shake(shake.x, shake.y);
+            PlayerCameraRig.Shake(shake.x * Mathf.Lerp(1f, scale, 0.6f), shake.y, modelRoot.forward);   // outgoing: bias the kick along the swing
+            if (GameManager.Instance != null) GameManager.Instance.HitStop(stop.x * Mathf.Lerp(1f, scale, 0.5f), stop.y);
+            PlayerCameraRig.FovKick(finisher ? 6f : 0f);
+
+            if (kill) KillConfirm(finisher);
+        }
+
+        /// <summary>A killing blow earns a distinct beat: a brief, deeper slow-mo + a bigger directional jolt + an FOV punch.
+        /// Routed through GameManager (respects LevelUpPending) and fired AFTER the connect hit-stop so the bigger kill stop
+        /// cleanly supersedes it (GameManager is last-writer-wins — no accumulation). Melee-only by design (an AoE/musou kill
+        /// would otherwise trigger constant slow-mo in a horde).</summary>
+        private void KillConfirm(bool finisher)
+        {
+            Vector2 stop = finisher ? data.finisherKillHitStop : data.killHitStop;
             if (GameManager.Instance != null) GameManager.Instance.HitStop(stop.x, stop.y);
+            Vector2 shake = finisher ? finisherShake : hitShake;
+            PlayerCameraRig.Shake(shake.x * 1.8f, shake.y, modelRoot.forward);
+            PlayerCameraRig.FovKick(finisher ? 5f : 2.5f);
         }
 
         // ---------- Hit helpers (non-alloc, front-arc) ----------
-        private int MeleeHit(float reach, float damage)
+        private int MeleeHit(float reach, float damage, out bool killed)
         {
+            killed = false;
             Vector3 origin = transform.position + Vector3.up;
             Vector3 fwd = modelRoot.forward;
             Vector3 c = origin + fwd * (reach * meleeHitboxCenterFactor);
@@ -799,6 +907,7 @@ namespace Hordebreakers
                 if (col.TryGetComponent(out IDamageable d) && d.IsAlive)
                 {
                     d.TakeDamage(damage, origin);
+                    if (!d.IsAlive) killed = true;   // alive (guard above) → dead this swing = a killing blow (Enemy.Die flips IsAlive synchronously)
                     hits++;
                     GainMusou(damage * data.musouGainDealtPerDamage);
                     if (_loadout != null)
@@ -893,8 +1002,11 @@ namespace Hordebreakers
             GainMusou(amount * data.musouGainTakenPerDamage);
             if (!blocked && hitFlash != null) hitFlash.Flash();   // a clean block isn't a hurt — skip the red flash
             float shakeMul = blocked ? 0.5f : (guardBroken ? 1.4f : 1f);   // guard-break reads with a bigger jolt
-            PlayerCameraRig.Shake(damageShake.x * shakeMul, damageShake.y * shakeMul);
+            Vector3 awayFromHit = transform.position - sourcePos;   // jolt the screen away from the threat (directional)
+            PlayerCameraRig.Shake(damageShake.x * shakeMul, damageShake.y * shakeMul, awayFromHit);
             if (GameManager.Instance != null) GameManager.Instance.HitStop(damageHitStop.x, damageHitStop.y);
+            if (!blocked) PostFxDirector.DamagePulse(guardBroken ? 1f : 0.7f);   // red vignette flash (a clean block isn't a hurt)
+            PostFxDirector.SetHealthFraction(HealthNormalized);                  // update the low-HP framing
             if (guardBroken) CombatAudio.PlayHit(transform.position);   // guard-break cue (heavy thunk through the guard)
             if (_hp <= 0f) { Die(); return; }
             if (!blocked && _voice != null) _voice.Hurt(amount);   // a clean block isn't a hurt — no hurt grunt
