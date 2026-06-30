@@ -109,8 +109,11 @@ namespace Hordebreakers
         private float _slotAngleDeg;   // absolute bearing (deg, 0 = +Z) of the assigned slot around the player
         private float _engageDwell;    // > 0 while circling the player after arrival, before the first telegraph is allowed
         private bool _wasInRange;      // last frame's InAttackRange, to detect arrival (the rising edge that arms the dwell)
-        private bool _aggro;           // engaged? false = PASSIVE (idles at spawn, no homing). Woken by proximity / damage / a nearby ally's alert.
+        private bool _aggro;           // engaged? false = PASSIVE (patrols its spawn, no homing). Woken by proximity / damage / a nearby ally's alert.
         private float _leashTimer;     // counts down while the player is beyond leashRadius; at 0 the enemy de-aggros (back to passive)
+        private Vector3 _patrolHome;   // spawn point (or where it last de-aggro'd) — patrol ambles within patrolRadius of this
+        private Vector3 _patrolTarget; // current patrol destination
+        private float _patrolPauseTimer; // > 0 while pausing at a patrol point before the next leg
         private static readonly Collider[] _sepHits = new Collider[16];
         private static int _activeAttackers;   // shared budget fallback when no CrowdDirector is present (StandoffLunge attacker-cap)
 
@@ -174,6 +177,9 @@ namespace Hordebreakers
             _wasInRange = false;
             _aggro = data.aggroRadius <= 0f;   // legacy (<=0) = aggro from spawn; otherwise spawn PASSIVE until alerted
             _leashTimer = data.leashTime;
+            _patrolHome = transform.position;   // spawn point — patrol ambles around here while passive
+            _patrolPauseTimer = UnityEngine.Random.Range(0f, data.patrolPauseMax);   // desync so the crowd doesn't amble in lockstep
+            PickPatrolTarget();
             if (CrowdDirector.Instance != null && _agentId < 0) _agentId = CrowdDirector.Instance.Register(this);   // pooled agents re-register each spawn
             if (_collider != null) _collider.enabled = true;
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
@@ -520,8 +526,44 @@ namespace Hordebreakers
             if (_engageDwell > 0f) _engageDwell -= dt;
         }
 
-        /// <summary>Passive (not yet engaged): hold position and idle — no homing, no player tracking. Waits to be alerted.</summary>
-        private void PassiveStep(float dt) => AnimStop(dt);
+        /// <summary>
+        /// Passive (not engaged): AMBLE around the spawn home instead of standing frozen — a "living" patrol. Walks to
+        /// random points within patrolRadius of home at a slow pace, pauses, repeats. No player tracking (it's unaware);
+        /// proximity / damage / alert still flips it to aggro via <see cref="UpdateAggro"/>. patrolRadius &lt;= 0 = stand still.
+        /// </summary>
+        private void PassiveStep(float dt)
+        {
+            if (_data.patrolRadius <= 0f) { AnimStop(dt); return; }
+            if (_patrolPauseTimer > 0f) { _patrolPauseTimer -= dt; AnimStop(dt); return; }   // resting at a patrol point
+            Vector3 to = _patrolTarget - transform.position; to.y = 0f;
+            if (to.sqrMagnitude <= 0.25f)   // arrived → pause, then pick the next leg
+            {
+                _patrolPauseTimer = UnityEngine.Random.Range(_data.patrolPauseMin, _data.patrolPauseMax);
+                PickPatrolTarget();
+                AnimStop(dt);
+                return;
+            }
+            Vector3 dir = to.normalized;
+            transform.position += dir * (_data.moveSpeed * _data.patrolSpeed * dt);
+            FaceDir(dir, dt);
+            SetAnimSpeed(animSpeedStrafe, animDampStrafe, dt);   // slow amble (reuses the circle anim speed)
+        }
+
+        /// <summary>Pick a fresh random patrol destination within patrolRadius of the spawn home (XZ plane).</summary>
+        private void PickPatrolTarget()
+        {
+            if (_data == null) { _patrolTarget = _patrolHome; return; }
+            Vector2 r = UnityEngine.Random.insideUnitCircle * _data.patrolRadius;
+            _patrolTarget = _patrolHome + new Vector3(r.x, 0f, r.y);
+        }
+
+        /// <summary>Turn the model toward an arbitrary heading (patrol uses this; FaceTowardPlayer is for engaged enemies).</summary>
+        private void FaceDir(Vector3 dir, float dt)
+        {
+            if (dir.sqrMagnitude < 0.0001f) return;
+            Quaternion target = Quaternion.LookRotation(dir);
+            modelRoot.rotation = Quaternion.RotateTowards(modelRoot.rotation, target, _data.turnSpeedDeg * dt);
+        }
 
         /// <summary>
         /// Drive the passive&lt;-&gt;engaged state (runs for both brains). PASSIVE: wake when the player enters aggroRadius.
@@ -543,7 +585,7 @@ namespace Hordebreakers
                 if (dist > _data.leashRadius)
                 {
                     _leashTimer -= dt;
-                    if (_leashTimer <= 0f) _aggro = false;   // lost interest → back to passive (idles where it stands)
+                    if (_leashTimer <= 0f) { _aggro = false; _patrolHome = transform.position; PickPatrolTarget(); }   // lost interest → patrol from here, don't trek back to spawn
                 }
                 else _leashTimer = _data.leashTime;
             }

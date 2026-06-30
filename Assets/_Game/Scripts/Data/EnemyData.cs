@@ -41,6 +41,16 @@ namespace Hordebreakers
         [Tooltip("When this enemy engages, it wakes allies within this radius too, so a cluster engages as one (not one-by-one popcorn). <= 0 = no alert propagation.")]
         public float alertRadius = 5f;
 
+        [Header("Patrol (passive wander around the spawn point, until alerted)")]
+        [Tooltip("Radius (m) the enemy ambles around its spawn point while passive — a living patrol instead of standing frozen. 0 = stand still.")]
+        public float patrolRadius = 4f;
+        [Tooltip("Patrol amble speed as a fraction of moveSpeed (slow, unhurried).")]
+        public float patrolSpeed = 0.4f;
+        [Tooltip("Min pause (s) at each patrol point before ambling to the next.")]
+        public float patrolPauseMin = 1f;
+        [Tooltip("Max pause (s) at each patrol point.")]
+        public float patrolPauseMax = 3f;
+
         [Header("Contact damage (strike)")]
         public float contactDamage = 5f;
         public float contactInterval = 1f;

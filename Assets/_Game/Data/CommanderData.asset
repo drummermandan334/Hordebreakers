@@ -22,6 +22,10 @@ MonoBehaviour:
   leashRadius: 0
   leashTime: 4
   alertRadius: 8
+  patrolRadius: 3
+  patrolSpeed: 0.4
+  patrolPauseMin: 1.5
+  patrolPauseMax: 4
   slamRange: 4
   slamRadius: 2.5
   slamDamage: 16

@@ -24,11 +24,17 @@ MonoBehaviour:
   leashRadius: 16
   leashTime: 3
   alertRadius: 5
+  patrolRadius: 4
+  patrolSpeed: 0.4
+  patrolPauseMin: 1
+  patrolPauseMax: 3
   contactDamage: 5
   contactInterval: 1
   contactRange: 1.4
   attackRange: 1.8
   holdRingMult: 1.6
+  maxSimultaneousAttackers: 3
+  engageDwell: 0.9
   attackWindup: 0.45
   attackRecovery: 0.45
   attackCooldown: 1.8
@@ -45,5 +51,8 @@ MonoBehaviour:
   knockbackPerDamage: 0.3
   deathKnockback: 16
   hitReactTime: 0.12
+  maxPoise: 14
+  poiseRegen: 6
+  staggerDuration: 0.55
   deathDuration: 1.1
   xpValue: 4

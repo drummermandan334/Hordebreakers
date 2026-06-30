@@ -29,6 +29,16 @@ namespace Hordebreakers
         [Tooltip("Wakes allies within this radius when it engages. <= 0 = no alert propagation.")]
         public float alertRadius = 6f;
 
+        [Header("Patrol (passive wander until alerted)")]
+        [Tooltip("Radius (m) the elite lumbers around its spawn while passive. 0 = stand still.")]
+        public float patrolRadius = 3f;
+        [Tooltip("Patrol amble speed as a fraction of moveSpeed.")]
+        public float patrolSpeed = 0.4f;
+        [Tooltip("Min pause (s) at each patrol point.")]
+        public float patrolPauseMin = 1.5f;
+        [Tooltip("Max pause (s) at each patrol point.")]
+        public float patrolPauseMax = 4f;
+
         [Header("Slam (telegraphed AoE)")]
         public float slamRange = 3.5f;      // begins a slam when the player is within this
         public float slamRadius = 3.5f;     // damage + telegraph radius
