@@ -12,6 +12,30 @@ namespace Hordebreakers
         [Header("Movement")]
         public float moveSpeed = 5f;
 
+        [Header("Movement weight / momentum (locomotion only — dodge/attack/musou stay instant)")]
+        [Tooltip("Ease rate toward target velocity while speeding up on the ground (higher = snappier).")]
+        public float groundAccel = 60f;
+        [Tooltip("Ease rate toward target velocity while slowing on the ground. Keep BELOW groundAccel so you slide to a stop — that asymmetry is the weight.")]
+        public float groundDecel = 35f;
+        [Tooltip("Single lazy ease rate while airborne — low so you can't fully redirect mid-air.")]
+        public float airAccel = 12f;
+
+        [Header("Sprint")]
+        [Tooltip("Top speed while sprinting (moveSpeed is the walk/jog top). Drives the Animator Speed param past 1.")]
+        public float sprintSpeed = 8f;
+        [Tooltip("Min analog left-stick magnitude before a gamepad sprint engages (no sprint on a half-push). KBM sprints on the hold key.")]
+        [Range(0f, 1f)] public float sprintStickThreshold = 0.6f;
+
+        [Header("Air / jump forgiveness")]
+        [Tooltip("Grace after walking off a ledge where a jump press still fires (coyote time).")]
+        public float coyoteTime = 0.12f;
+        [Tooltip("A jump press this long before landing still fires on touchdown (input buffer).")]
+        public float jumpBuffer = 0.12f;
+        [Tooltip("Airtime below this on landing = no landing FX (small hops stay silent).")]
+        public float landSoftAirTime = 0.25f;
+        [Tooltip("Airtime at/above this on landing = full-strength landing FX (shake/dust/SFX scale up to here).")]
+        public float landHardAirTime = 0.7f;
+
         [Header("Dodge  (distance ~= dodgeSpeed * dodgeDuration; gated by charges that refill over the cooldown)")]
         public float dodgeSpeed = 16f;
         public float dodgeDuration = 0.25f;
@@ -63,5 +87,15 @@ namespace Hordebreakers
         public float dodgeCancelPhase = 0.55f;
         [Tooltip("Playback-speed multiplier for attack swings, driven onto the Animator's 'AttackSpeed' float param. 1 = authored speed; Augments raise it. minSwingInterval (wall-clock) still floors the effective rate.")]
         public float attackSpeedMult = 1f;
+
+        [Header("Impact scaling (heavier hits read heavier)")]
+        [Tooltip("Damage / lightDamage is clamped to this ceiling when scaling hit-stop & shake, so a huge heavy doesn't lock the screen.")]
+        public float hitStopDamageScaleMax = 4f;
+
+        [Header("Kill confirm (x = seconds, y = timeScale) — a distinct beat on a killing blow")]
+        [Tooltip("Brief slow-mo on a normal killing blow.")]
+        public Vector2 killHitStop = new Vector2(0.05f, 0.15f);
+        [Tooltip("Deeper slow-mo on a finisher killing blow.")]
+        public Vector2 finisherKillHitStop = new Vector2(0.09f, 0.08f);
     }
 }

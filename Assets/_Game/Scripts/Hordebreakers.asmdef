@@ -7,7 +7,9 @@
         "Unity.Cinemachine",
         "UnityEngine.UI",
         "Unity.Behavior",
-        "Unity.Properties"
+        "Unity.Properties",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
