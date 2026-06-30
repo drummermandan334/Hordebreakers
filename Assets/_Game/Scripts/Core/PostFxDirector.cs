@@ -58,13 +58,23 @@ namespace Hordebreakers
             if (Instance != null && Instance != this) { Destroy(this); return; }
             Instance = this;
             _volume = GetComponent<Volume>();
+            EnsureOverrides();   // may fail here (the Volume's runtime profile isn't populated until enable) → Update retries
+        }
 
-            VolumeProfile p = _volume.profile;   // runtime instance Unity clones — safe to mutate (NOT sharedProfile)
-            if (p == null) return;
+        /// <summary>
+        /// Bind (or add) the Volume overrides we drive. The Volume's runtime profile INSTANCE isn't populated at Awake
+        /// (URP fills it on enable), so the first call can fail — <see cref="Update"/> retries until it succeeds.
+        /// Idempotent (returns true once bound) and re-binds if a domain reload nulls these non-serialized refs.
+        /// </summary>
+        private bool EnsureOverrides()
+        {
+            if (_vignette != null) return true;
+            if (_volume == null) _volume = GetComponent<Volume>();
+            VolumeProfile p = _volume != null ? _volume.profile : null;   // runtime instance (safe to mutate; NOT sharedProfile)
+            if (p == null) return false;
             if (!p.TryGet(out _vignette)) _vignette = p.Add<Vignette>(true);
             if (!p.TryGet(out _aberration)) _aberration = p.Add<ChromaticAberration>(true);
             if (!p.TryGet(out _color)) _color = p.Add<ColorAdjustments>(true);
-
             // Ensure the parameters we write are active, else URP ignores the .value.
             _vignette.intensity.overrideState = true;
             _vignette.color.overrideState = true;
@@ -72,13 +82,14 @@ namespace Hordebreakers
             _color.saturation.overrideState = true;
             _color.contrast.overrideState = true;
             _color.postExposure.overrideState = true;
+            return true;
         }
 
         private void OnDestroy() { if (Instance == this) Instance = null; }
 
         private void Update()
         {
-            if (_vignette == null) return;
+            if (_vignette == null && !EnsureOverrides()) return;   // retry the bind until the Volume's runtime profile is ready
             float dt = Time.unscaledDeltaTime;   // keep animating through hit-stop / slow-mo
 
             if (_damagePulse > 0f) _damagePulse = Mathf.MoveTowards(_damagePulse, 0f, damagePulseDecay * dt);

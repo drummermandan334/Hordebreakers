@@ -14,6 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.PlayerCombatData
   maxHp: 100
   moveSpeed: 5
+  groundAccel: 60
+  groundDecel: 35
+  airAccel: 12
+  sprintSpeed: 8
+  sprintStickThreshold: 0.6
+  coyoteTime: 0.12
+  jumpBuffer: 0.12
+  landSoftAirTime: 0.25
+  landHardAirTime: 0.7
   dodgeSpeed: 6
   dodgeDuration: 0.25
   dodgeIFrames: 0.6
@@ -41,3 +50,6 @@ MonoBehaviour:
   attackSteerSpeed: 1.5
   dodgeCancelPhase: 0.55
   attackSpeedMult: 1
+  hitStopDamageScaleMax: 4
+  killHitStop: {x: 0.05, y: 0.15}
+  finisherKillHitStop: {x: 0.09, y: 0.08}
