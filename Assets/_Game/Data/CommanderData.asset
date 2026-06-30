@@ -18,6 +18,10 @@ MonoBehaviour:
   separationRadius: 1.4
   separationForce: 6
   guardBreaks: 1
+  aggroRadius: 100
+  leashRadius: 0
+  leashTime: 4
+  alertRadius: 8
   slamRange: 4
   slamRadius: 2.5
   slamDamage: 16

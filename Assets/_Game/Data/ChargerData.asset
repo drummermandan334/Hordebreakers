@@ -20,6 +20,10 @@ MonoBehaviour:
   separationForce: 6
   playerSpacing: 0.6
   guardBreaks: 1
+  aggroRadius: 12
+  leashRadius: 16
+  leashTime: 3
+  alertRadius: 5
   contactDamage: 5
   contactInterval: 1
   contactRange: 1.4

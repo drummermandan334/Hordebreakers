@@ -109,6 +109,8 @@ namespace Hordebreakers
         private float _slotAngleDeg;   // absolute bearing (deg, 0 = +Z) of the assigned slot around the player
         private float _engageDwell;    // > 0 while circling the player after arrival, before the first telegraph is allowed
         private bool _wasInRange;      // last frame's InAttackRange, to detect arrival (the rising edge that arms the dwell)
+        private bool _aggro;           // engaged? false = PASSIVE (idles at spawn, no homing). Woken by proximity / damage / a nearby ally's alert.
+        private float _leashTimer;     // counts down while the player is beyond leashRadius; at 0 the enemy de-aggros (back to passive)
         private static readonly Collider[] _sepHits = new Collider[16];
         private static int _activeAttackers;   // shared budget fallback when no CrowdDirector is present (StandoffLunge attacker-cap)
 
@@ -127,10 +129,13 @@ namespace Hordebreakers
         public int AgentId => _agentId;
         public Transform AgentTransform => transform;
         // Ring-waiters are the standoff rushers; chargers rush in and dummies don't fight, so they don't hold a slot.
-        public bool WantsSlot => _active && !_dying && _data != null && _data.archetype == AttackArchetype.StandoffLunge;
+        // Passive (un-engaged) rushers don't claim a slot either — they're idling at the perimeter, not circling the player.
+        public bool WantsSlot => _active && !_dying && _aggro && _data != null && _data.archetype == AttackArchetype.StandoffLunge;
         public float Aggression => _aggression;
         public void AssignSlotAngle(float deg) { _slotAngleDeg = deg; _hasSlot = true; }
         public void ClearSlot() => _hasSlot = false;
+        // Alerted by a nearby ally engaging — wake but DON'T re-propagate (one hop, so it can't cascade arena-wide).
+        public void Wake() => Aggro(false);
 
         private void Awake()
         {
@@ -167,6 +172,8 @@ namespace Hordebreakers
             _hasAttackToken = false;
             _engageDwell = 0f;
             _wasInRange = false;
+            _aggro = data.aggroRadius <= 0f;   // legacy (<=0) = aggro from spawn; otherwise spawn PASSIVE until alerted
+            _leashTimer = data.leashTime;
             if (CrowdDirector.Instance != null && _agentId < 0) _agentId = CrowdDirector.Instance.Register(this);   // pooled agents re-register each spawn
             if (_collider != null) _collider.enabled = true;
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
@@ -187,6 +194,7 @@ namespace Hordebreakers
                 if (_cooldownTimer > 0f) _cooldownTimer -= dt;
                 if (_staggerTimer > 0f) _staggerTimer -= dt;
                 TickPoise(dt);
+                UpdateAggro(dt);   // resolve aggro BEFORE the dwell — the dwell's InAttackRange check depends on _aggro
                 TickEngage(dt);
                 return;
             }
@@ -199,6 +207,7 @@ namespace Hordebreakers
 
             if (_cooldownTimer > 0f) _cooldownTimer -= dt;
             TickPoise(dt);
+            UpdateAggro(dt);   // resolve aggro BEFORE the dwell — the dwell's InAttackRange check depends on _aggro
             TickEngage(dt);
             if (_staggerTimer > 0f) { _staggerTimer -= dt; AnimStop(dt); return; }
 
@@ -259,6 +268,7 @@ namespace Hordebreakers
         {
             get
             {
+                if (!_aggro) return false;   // passive (un-engaged): never "in range" → the brain idles via ApproachStep, never attacks
                 if (_data.archetype == AttackArchetype.Dummy) return false;   // dummies never attack
                 float dist = PlanarDist();
                 if (_data.archetype == AttackArchetype.Charger) return dist <= _data.chargeStartRange;
@@ -283,6 +293,7 @@ namespace Hordebreakers
         {
             if (_staggerTimer > 0f) { AnimStop(dt); return; }
             if (_data.archetype == AttackArchetype.Dummy) { FaceTowardPlayer(dt); AnimStop(dt); return; }
+            if (!_aggro) { PassiveStep(dt); return; }   // not engaged yet — idle at the perimeter instead of homing in
             if (_data.archetype == AttackArchetype.Charger) { RushStep(dt); return; }
 
             Vector3 fromPlayer = transform.position - _player.position; fromPlayer.y = 0f;
@@ -509,6 +520,45 @@ namespace Hordebreakers
             if (_engageDwell > 0f) _engageDwell -= dt;
         }
 
+        /// <summary>Passive (not yet engaged): hold position and idle — no homing, no player tracking. Waits to be alerted.</summary>
+        private void PassiveStep(float dt) => AnimStop(dt);
+
+        /// <summary>
+        /// Drive the passive&lt;-&gt;engaged state (runs for both brains). PASSIVE: wake when the player enters aggroRadius.
+        /// ENGAGED: leash back to passive if the player stays beyond leashRadius for leashTime. Movement obeys this via the
+        /// ApproachStep verb (idles while passive), so neither the FSM nor the graph needs to know about aggro.
+        /// </summary>
+        private void UpdateAggro(float dt)
+        {
+            if (_data == null || _data.archetype == AttackArchetype.Dummy) return;   // dummies never fight
+            if (_data.aggroRadius <= 0f) return;   // legacy: aggro'd from spawn, never leashes / re-evaluates
+            float dist = PlanarDist();
+            if (!_aggro)
+            {
+                if (_data.aggroRadius > 0f && dist <= _data.aggroRadius) Aggro(true);   // player got close → engage + alert allies
+                return;
+            }
+            if (_data.leashRadius > 0f)
+            {
+                if (dist > _data.leashRadius)
+                {
+                    _leashTimer -= dt;
+                    if (_leashTimer <= 0f) _aggro = false;   // lost interest → back to passive (idles where it stands)
+                }
+                else _leashTimer = _data.leashTime;
+            }
+        }
+
+        /// <summary>Engage the player. <paramref name="propagate"/> also raises the alarm to nearby allies (one hop) so a cluster wakes together.</summary>
+        private void Aggro(bool propagate)
+        {
+            if (_aggro || !_active || _dying || _data == null || _data.archetype == AttackArchetype.Dummy) return;
+            _aggro = true;
+            _leashTimer = _data.leashTime;
+            if (propagate && _data.alertRadius > 0f && CrowdDirector.Instance != null)
+                CrowdDirector.Instance.AlertNear(transform.position, _data.alertRadius, _agentId);
+        }
+
         private void TickKnockback(float dt)
         {
             if (_knockback.sqrMagnitude > 0.0001f)
@@ -597,6 +647,7 @@ namespace Hordebreakers
         public void TakeDamage(float amount, Vector3 sourcePos)
         {
             if (!_active) return;
+            Aggro(true);   // getting hit always engages it (and wakes nearby allies) — you can't poke a passive enemy for free
             _hp -= amount;
             if (hitFlash != null) hitFlash.Flash();
             CombatAudio.PlayHit(transform.position);   // impact thunk (clips live on CombatAudio)

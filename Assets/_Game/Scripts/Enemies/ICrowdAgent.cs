@@ -25,5 +25,8 @@ namespace Hordebreakers
         void AssignSlotAngle(float deg);
         /// <summary>Director clears the assignment (agent falls back to its own circling).</summary>
         void ClearSlot();
+
+        /// <summary>Alerted by a nearby ally engaging — wake (go aggro) WITHOUT re-propagating, so an alert can't cascade across the arena.</summary>
+        void Wake();
     }
 }

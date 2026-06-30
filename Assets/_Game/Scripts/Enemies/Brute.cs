@@ -81,6 +81,8 @@ namespace Hordebreakers
         private float _engageDwell;    // > 0 while prowling/circling after arrival, before the first slam is allowed
         private bool _wasInRange;      // last frame's InAttackRange, to detect arrival (arms the dwell)
         private float _strafeDir;      // +1 / -1 — which way it circles the player while prowling
+        private bool _aggro;           // engaged? false = PASSIVE (idles at spawn). Woken by proximity / damage / a nearby ally's alert.
+        private float _leashTimer;     // counts down while the player is beyond leashRadius; at 0 the elite de-aggros
         private static readonly Collider[] _sepHits = new Collider[16];
 
         private static readonly int AnimSpeed = Animator.StringToHash("Speed");
@@ -96,6 +98,7 @@ namespace Hordebreakers
         public Transform AgentTransform => transform;
         public bool WantsSlot => false;
         public float Aggression => 1f;   // the boss is always top-priority threat
+        public void Wake() => Aggro(false);   // alerted by a nearby ally engaging — wake without re-propagating
         public void AssignSlotAngle(float deg) { }
         public void ClearSlot() { }
 
@@ -131,6 +134,8 @@ namespace Hordebreakers
             _engageDwell = 0f;
             _wasInRange = false;
             _strafeDir = UnityEngine.Random.value < 0.5f ? -1f : 1f;
+            _aggro = data.aggroRadius <= 0f;   // legacy (<=0) = aggro from spawn; otherwise spawn PASSIVE until alerted
+            _leashTimer = data.leashTime;
             if (CrowdDirector.Instance != null && _agentId < 0) _agentId = CrowdDirector.Instance.Register(this);   // pooled brutes re-register each spawn
             if (_collider != null) _collider.enabled = true;
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
@@ -150,6 +155,7 @@ namespace Hordebreakers
                 if (_cdTimer > 0f) _cdTimer -= dt;
                 if (_staggerTimer > 0f) _staggerTimer -= dt;
                 TickPoise(dt);
+                UpdateAggro(dt);   // resolve aggro BEFORE the dwell — the dwell's InAttackRange check depends on _aggro
                 TickEngage(dt);
                 return;
             }
@@ -159,6 +165,7 @@ namespace Hordebreakers
             if (_state == State.Seek) transform.position += Separation() * (data.separationForce * dt);   // separation only while not mid-slam
             if (_cdTimer > 0f) _cdTimer -= dt;
             TickPoise(dt);
+            UpdateAggro(dt);   // resolve aggro BEFORE the dwell — the dwell's InAttackRange check depends on _aggro
             TickEngage(dt);
             if (_staggerTimer > 0f) { _staggerTimer -= dt; AnimStop(dt); return; }
 
@@ -213,12 +220,13 @@ namespace Hordebreakers
 
         // ---------------- IEnemyBody (the body API — driven by both brains) ----------------
         public bool IsStaggered => _staggerTimer > 0f;
-        public bool InAttackRange => PlanarDist() <= data.slamRange;
+        public bool InAttackRange => _aggro && PlanarDist() <= data.slamRange;   // passive elites never engage (idle until alerted)
         public bool OffCooldown => _cdTimer <= 0f && _engageDwell <= 0f && _staggerTimer <= 0f;   // cooled down, done prowling, not flinching
 
         public void ApproachStep(float dt)
         {
             if (_staggerTimer > 0f) { AnimStop(dt); return; }
+            if (!_aggro) { AnimStop(dt); return; }   // passive — hold position until engaged
             Vector3 to = _player.position - transform.position; to.y = 0f;
             float dist = to.magnitude;
             FaceTowardPlayer(dt);
@@ -351,6 +359,34 @@ namespace Hordebreakers
             if (_engageDwell > 0f) _engageDwell -= dt;
         }
 
+        /// <summary>Drive the passive&lt;-&gt;engaged state (both brains). Passive elites idle until the player enters aggroRadius; engaged ones leash back if the player stays beyond leashRadius for leashTime.</summary>
+        private void UpdateAggro(float dt)
+        {
+            if (data == null) return;
+            if (data.aggroRadius <= 0f) return;   // legacy: aggro'd from spawn, never leashes / re-evaluates
+            float dist = PlanarDist();
+            if (!_aggro)
+            {
+                if (data.aggroRadius > 0f && dist <= data.aggroRadius) Aggro(true);
+                return;
+            }
+            if (data.leashRadius > 0f)
+            {
+                if (dist > data.leashRadius) { _leashTimer -= dt; if (_leashTimer <= 0f) _aggro = false; }
+                else _leashTimer = data.leashTime;
+            }
+        }
+
+        /// <summary>Engage the player; <paramref name="propagate"/> also alerts nearby allies (one hop) so a cluster wakes together.</summary>
+        private void Aggro(bool propagate)
+        {
+            if (_aggro || !_active || _dying || data == null) return;
+            _aggro = true;
+            _leashTimer = data.leashTime;
+            if (propagate && data.alertRadius > 0f && CrowdDirector.Instance != null)
+                CrowdDirector.Instance.AlertNear(transform.position, data.alertRadius, _agentId);
+        }
+
         // ---------------- helpers ----------------
         private float PlanarDist()
         {
@@ -426,6 +462,7 @@ namespace Hordebreakers
         public void TakeDamage(float amount, Vector3 sourcePos)
         {
             if (!_active) return;
+            Aggro(true);   // getting hit always engages the elite (and wakes nearby allies)
             _hp -= amount;
             if (hitFlash != null) hitFlash.Flash();
             CombatAudio.PlayHit(transform.position);

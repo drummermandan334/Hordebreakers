@@ -19,6 +19,16 @@ namespace Hordebreakers
         [Tooltip("The slam shatters a held block (guard-break) — turtling through an elite's slam should fail. Elites set this on.")]
         public bool guardBreaks = true;
 
+        [Header("Aggro (engage range — PASSIVE until alerted)")]
+        [Tooltip("The elite idles at its spawn until the player comes within this radius, it gets hit, or a nearby ally raises the alarm. <= 0 = legacy: aggro from spawn. (The commander uses a huge value so it hunts you once it joins.)")]
+        public float aggroRadius = 12f;
+        [Tooltip("Once engaged, de-aggros if the player stays beyond this radius for leashTime. <= 0 = never leash.")]
+        public float leashRadius = 18f;
+        [Tooltip("Seconds beyond leashRadius before it gives up.")]
+        public float leashTime = 4f;
+        [Tooltip("Wakes allies within this radius when it engages. <= 0 = no alert propagation.")]
+        public float alertRadius = 6f;
+
         [Header("Slam (telegraphed AoE)")]
         public float slamRange = 3.5f;      // begins a slam when the player is within this
         public float slamRadius = 3.5f;     // damage + telegraph radius

@@ -118,6 +118,34 @@ namespace Hordebreakers
         /// <summary>The spawner pushes the current wave so the attack budget escalates (more attackers, not more bodies).</summary>
         public void SetWave(int wave) => _wave = Mathf.Max(1, wave);
 
+        /// <summary>
+        /// Alert propagation: wake every managed agent within <paramref name="radius"/> of <paramref name="pos"/> (one
+        /// hop — the woken agents don't re-propagate, so a single engage can't cascade across the whole arena). Skips the
+        /// caller (<paramref name="exceptId"/>). Routed through the director (not a physics query) so it works across
+        /// husks/brutes regardless of layers, with no allocation.
+        /// </summary>
+        public void AlertNear(Vector3 pos, float radius, int exceptId)
+        {
+            if (radius <= 0f)
+            {
+                return;
+            }
+            float rSq = radius * radius;
+            for (int i = 0; i < _agents.Count; i++)
+            {
+                ICrowdAgent a = _agents[i];
+                if (a == null || !a.IsAlive || a.AgentId == exceptId || a.AgentTransform == null)
+                {
+                    continue;
+                }
+                Vector3 to = a.AgentTransform.position - pos; to.y = 0f;
+                if (to.sqrMagnitude <= rSq)
+                {
+                    a.Wake();
+                }
+            }
+        }
+
         /// <summary>Pull-model token request: an agent calls this at the instant it commits an attack. True = granted.</summary>
         public bool TryBeginAttack(int agentId, int cost, bool heavyTell) => _control != null && _control.TryAcquireToken(agentId, cost, heavyTell);
 

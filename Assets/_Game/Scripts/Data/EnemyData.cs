@@ -31,6 +31,16 @@ namespace Hordebreakers
         [Tooltip("This enemy's committed strike (lunge/charge) shatters a held block (guard-break), staggering a turtling player. Chaff lunges leave this off; pressure units (Charger) turn it on.")]
         public bool guardBreaks = false;
 
+        [Header("Aggro (engage range — PASSIVE until alerted)")]
+        [Tooltip("The enemy idles at its spawn (no homing) until the player comes within this radius, it gets hit, or a nearby ally raises the alarm. <= 0 = legacy: aggro from spawn (always chases). The master dial against the Vampire-Survivors swarm.")]
+        public float aggroRadius = 10f;
+        [Tooltip("Once engaged, the enemy de-aggros (back to passive) if the player stays beyond this radius for leashTime. <= 0 = never leash (stays awake once woken).")]
+        public float leashRadius = 16f;
+        [Tooltip("Seconds the player must stay beyond leashRadius before the enemy gives up.")]
+        public float leashTime = 3f;
+        [Tooltip("When this enemy engages, it wakes allies within this radius too, so a cluster engages as one (not one-by-one popcorn). <= 0 = no alert propagation.")]
+        public float alertRadius = 5f;
+
         [Header("Contact damage (strike)")]
         public float contactDamage = 5f;
         public float contactInterval = 1f;
