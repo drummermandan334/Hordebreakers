@@ -60,6 +60,7 @@ namespace Hordebreakers
         private void LateUpdate()
         {
             if (!_active) return;
+            if (_mpb == null) _mpb = new MaterialPropertyBlock();   // non-serializable: a domain reload mid-play nulls it without re-running Awake
             float dt = Time.deltaTime;
             _timer -= dt;
             _phase += dt * pulseHz * (Mathf.PI * 2f);
@@ -86,6 +87,8 @@ namespace Hordebreakers
 
         private void Restore()
         {
+            if (_mpb == null) _mpb = new MaterialPropertyBlock();   // guard the same domain-reload null as LateUpdate
+            if (_renderers == null) return;
             for (int i = 0; i < _renderers.Length; i++)
             {
                 Renderer r = _renderers[i];

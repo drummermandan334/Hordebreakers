@@ -43,6 +43,8 @@ namespace Hordebreakers
         public float holdRingMult = 1.6f;
         [Tooltip("StandoffLunge only: at most this many can be mid-attack (telegraph->lunge) at once across the whole arena; the rest keep orbiting until a slot frees. The biggest anti-swarm lever — turns the face-pile into an encirclement.")]
         public int maxSimultaneousAttackers = 3;
+        [Tooltip("StandoffLunge only: after arriving in the ring the enemy circles the player for this long (randomized +/-20%) before its FIRST telegraph — so it doesn't strike the instant it reaches you. Re-armed each time it re-enters range. 0 = strike as soon as off cooldown (old behaviour).")]
+        public float engageDwell = 0.9f;
         [Tooltip("Telegraph time before the lunge — the dodge window.")]
         public float attackWindup = 0.45f;
         [Tooltip("Recovery after the lunge before it can move/attack again.")]

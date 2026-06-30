@@ -108,7 +108,8 @@ namespace Hordebreakers
         private int _blockLayer = -1;                  // upper-body Block override layer; weight driven by _blocking
 
         // timers / state
-        private float _dodgeTimer;         // > 0 while dashing
+        private float _dodgeTimer;         // > 0 while dashing (the short forward-dash window)
+        private float _iFrameTimer;        // > 0 while invulnerable — its OWN timer so i-frames can span the long roll, not just the dash
         private float _dodgeCdTimer;       // > 0 while a dodge charge is recharging
         private int _dodgeCharges;         // banked dodges (spent per roll, refill over dodgeCooldown); replaces the old stamina gate
         private float _guardBreakTimer;    // > 0 while staggered by a guard-break (movement paused, like an enemy stagger)
@@ -231,7 +232,7 @@ namespace Hordebreakers
             else transform.position = position;
             _verticalVel = 0f;
             _musou = 0f; _musouActive = false; _musouTimer = 0f;
-            _dodgeTimer = 0f; _dodgeCdTimer = 0f; _dodgeCharges = Mathf.Max(1, data.dodgeMaxCharges);
+            _dodgeTimer = 0f; _iFrameTimer = 0f; _dodgeCdTimer = 0f; _dodgeCharges = Mathf.Max(1, data.dodgeMaxCharges);
             _blocking = false; _guardBreakTimer = 0f;
             _attackStepTimer = 0f; _attackVel = Vector3.zero;
             _bufferedAttack = 0; _bufferedDodge = false; _comboStep = 0;
@@ -381,9 +382,10 @@ namespace Hordebreakers
             if (_hitReactCdTimer > 0f) _hitReactCdTimer -= dt;
             if (_guardBreakTimer > 0f) _guardBreakTimer -= dt;
             if (_dodgeTimer > 0f) _dodgeTimer -= dt;
+            if (_iFrameTimer > 0f) _iFrameTimer -= dt;
             for (int i = 0; i < _abilityCooldowns.Length; i++) { if (_abilityCooldowns[i] > 0f) _abilityCooldowns[i] -= dt; }
             if (_castCdTimer > 0f) _castCdTimer -= dt;
-            _invulnerable = _dodgeTimer > 0f && _dodgeTimer > (data.dodgeDuration - data.dodgeIFrames);
+            _invulnerable = _iFrameTimer > 0f;   // i-frames run on their own timer (dodgeIFrames seconds from the roll start), independent of the short dash window
 
             // Dodge charges: refill one per dodgeCooldown while below max (the dodge gate now that stamina is gone).
             int maxCharges = Mathf.Max(1, data.dodgeMaxCharges);
@@ -719,6 +721,7 @@ namespace Hordebreakers
             _dodgeCharges = Mathf.Max(0, _dodgeCharges - 1);
             _dodgeDir = moveDir.sqrMagnitude > 0.01f ? moveDir.normalized : modelRoot.forward;
             _dodgeTimer = data.dodgeDuration;
+            _iFrameTimer = data.dodgeIFrames;   // invulnerable from the roll's start for dodgeIFrames seconds (spans most of the roll now)
             modelRoot.rotation = Quaternion.LookRotation(_dodgeDir);
             CombatAudio.PlayDodge(transform.position);   // roll whoosh (its own clip set on CombatAudio — not a footstep)
             if (animator != null) animator.SetTrigger(AnimDodge);

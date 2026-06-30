@@ -905,6 +905,10 @@ PrefabInstance:
       value: 0.75
       objectReference: {fileID: 0}
     - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: meleeArcDot
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       propertyPath: lungeForward
       value: 2.5
       objectReference: {fileID: 0}
@@ -975,6 +979,14 @@ PrefabInstance:
     - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       propertyPath: meleeContactPhase
       value: 0.4
+      objectReference: {fileID: 0}
+    - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: meleeHitboxCenterFactor
+      value: 0.55
+      objectReference: {fileID: 0}
+    - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: meleeHitboxRadiusFactor
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 8622645681966147586, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       propertyPath: startingAbilities.Array.size
@@ -1984,7 +1996,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -3371,7 +3383,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.4, y: 1.4, z: 1.4}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 764543375}
@@ -3433,6 +3445,57 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 973832078}
   m_Mesh: {fileID: -8278102857510682554, guid: ebd0dd4d6a7bf68438de9416d7c7393d, type: 3}
+--- !u!1 &980832323
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 980832324}
+  - component: {fileID: 980832325}
+  m_Layer: 0
+  m_Name: IncomingAttackWarning
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &980832324
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 980832323}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -960, y: -583.75104, z: 0}
+  m_LocalScale: {x: 1.6148024, y: 1.6148024, z: 1.6148024}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1836245096}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &980832325
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 980832323}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 84cda381a4339de44b7c106674b8b7fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hordebreakers::Hordebreakers.IncomingAttackWarning
+  warningColor: {r: 1, g: 0.16, b: 0.12, a: 1}
+  radius: 150
+  arrowSize: 72
+  pulseHz: 5
+  maxWarnings: 8
+  anchorHeight: 1
+  fallbackAnchorY: 0.42
 --- !u!1 &981540256
 GameObject:
   m_ObjectHideFlags: 0
@@ -6148,7 +6211,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4284930559
   m_fontColor: {r: 1, g: 0.85, b: 0.4, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -6161,7 +6224,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -6305,16 +6368,18 @@ MonoBehaviour:
   spawnRadius: 18
   huskPoolSize: 64
   brutePoolSize: 12
-  garrisonBudget: 60
+  waveCount: 8
+  commanderWave: 6
+  firstWaveDelay: 4
+  interWaveTime: 14
   maxAlive: 24
-  reinforceInterval: 1.5
-  chargerUnlockTime: 15
+  baseWaveSize: 4
+  waveSizeGrowth: 1.5
+  batchSpawnStagger: 0.25
+  chargerStartWave: 3
   chargerChance: 0.35
-  bruteUnlockTime: 35
+  bruteStartWave: 5
   bruteChance: 0.2
-  ceilingTime: 70
-  ceilingIntervalMult: 0.5
-  ceilingEliteBoost: 0.25
 --- !u!4 &1635233891
 Transform:
   m_ObjectHideFlags: 0
@@ -6327,7 +6392,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 1966097734}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1638658575
@@ -7232,6 +7298,7 @@ RectTransform:
   - {fileID: 589077962}
   - {fileID: 1618258541}
   - {fileID: 1763029103}
+  - {fileID: 980832324}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -7695,6 +7762,57 @@ Transform:
   - {fileID: 1124787378}
   m_Father: {fileID: 1351231436}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1966097733
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1966097734}
+  - component: {fileID: 1966097735}
+  m_Layer: 0
+  m_Name: CrowdDirector
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1966097734
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1966097733}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1635233891}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1966097735
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1966097733}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6bf6db62c0d816b47b29a8a234e6a61f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hordebreakers::Hordebreakers.CrowdDirector
+  slotCount: 8
+  baseAttackBudget: 2
+  maxAttackBudget: 5
+  heavyTellBudget: 1
+  wavesPerBudgetStep: 3
+  capacity: 64
+  threatReferenceRadius: 8
 --- !u!1 &1978179179
 GameObject:
   m_ObjectHideFlags: 0

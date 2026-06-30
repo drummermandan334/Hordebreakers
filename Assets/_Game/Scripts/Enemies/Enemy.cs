@@ -58,6 +58,10 @@ namespace Hordebreakers
         [SerializeField] private float strafeSpeedAggressionScale = 0.35f;
         [Tooltip("Wind-up aborts (rusher) if the player escapes past standoff * this during the telegraph.")]
         [SerializeField] private float telegraphAbortReachMult = 1.5f;
+        [Tooltip("StandoffLunge: during the wind-up the rusher STALKS IN to this distance (m) so the strike commits from melee range — close enough that the player can hit it to interrupt (you can't reach a strike thrown from the wide orbit ring). Keep within the player's melee reach (~2m).")]
+        [SerializeField] private float telegraphStrikeRange = 1.7f;
+        [Tooltip("StandoffLunge: stalk-in speed (m/s) during the wind-up as it closes to telegraphStrikeRange. Higher = reaches melee range sooner, so the player gets a longer window to interrupt.")]
+        [SerializeField] private float telegraphStepSpeed = 4f;
         [Tooltip("Charger: between charges it backs off to chargeStartRange * this, so the next charge is a real run-up instead of a point-blank tap.")]
         [SerializeField] private float chargerHoldFraction = 0.8f;
 
@@ -103,6 +107,8 @@ namespace Hordebreakers
         private int _agentId = -1;     // CrowdDirector handle; -1 = unmanaged (solo fallback)
         private bool _hasSlot;         // director assigned us an approach-ring slot
         private float _slotAngleDeg;   // absolute bearing (deg, 0 = +Z) of the assigned slot around the player
+        private float _engageDwell;    // > 0 while circling the player after arrival, before the first telegraph is allowed
+        private bool _wasInRange;      // last frame's InAttackRange, to detect arrival (the rising edge that arms the dwell)
         private static readonly Collider[] _sepHits = new Collider[16];
         private static int _activeAttackers;   // shared budget fallback when no CrowdDirector is present (StandoffLunge attacker-cap)
 
@@ -159,6 +165,8 @@ namespace Hordebreakers
             _poise = data.maxPoise;
             _hasSlot = false;
             _hasAttackToken = false;
+            _engageDwell = 0f;
+            _wasInRange = false;
             if (CrowdDirector.Instance != null && _agentId < 0) _agentId = CrowdDirector.Instance.Register(this);   // pooled agents re-register each spawn
             if (_collider != null) _collider.enabled = true;
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
@@ -179,6 +187,7 @@ namespace Hordebreakers
                 if (_cooldownTimer > 0f) _cooldownTimer -= dt;
                 if (_staggerTimer > 0f) _staggerTimer -= dt;
                 TickPoise(dt);
+                TickEngage(dt);
                 return;
             }
 
@@ -190,6 +199,7 @@ namespace Hordebreakers
 
             if (_cooldownTimer > 0f) _cooldownTimer -= dt;
             TickPoise(dt);
+            TickEngage(dt);
             if (_staggerTimer > 0f) { _staggerTimer -= dt; AnimStop(dt); return; }
 
             switch (_state)
@@ -213,6 +223,7 @@ namespace Hordebreakers
         private void OnDisable()
         {
             ReleaseAttackToken();   // pooled/despawned mid-attack → free the token (static fallback too)
+            IncomingAttackWarning.Cancel(transform);
             if (_agentId >= 0 && CrowdDirector.Instance != null) CrowdDirector.Instance.Unregister(this);   // frees token + slot, drops from registry
             _agentId = -1;
             _hasSlot = false;
@@ -260,6 +271,8 @@ namespace Hordebreakers
             get
             {
                 if (_cooldownTimer > 0f) return false;
+                if (_staggerTimer > 0f) return false;   // flinching → don't open a new wind-up (the BT brain has no global stagger gate)
+                if (_engageDwell > 0f) return false;   // freshly arrived — circle a beat before the first strike
                 if (CrowdDirector.Instance != null) return true;   // budget is enforced when the token is pulled in TryStartTelegraph
                 // No director: keep the legacy static attacker-cap pre-check (rusher needs a free slot).
                 return _data.archetype != AttackArchetype.StandoffLunge || _activeAttackers < _data.maxSimultaneousAttackers;
@@ -286,6 +299,7 @@ namespace Hordebreakers
             if (step.sqrMagnitude > toTarget.sqrMagnitude) step = toTarget;
             transform.position += step;
             SetAnimSpeed(animSpeedApproach, animDampApproach, dt);
+            ArmEngageDwell();   // arm the dwell IN the graph tick the instant we reach the ring, BEFORE OffCooldown is read
         }
 
         public void RepositionStep(float dt)
@@ -336,6 +350,7 @@ namespace Hordebreakers
             _stateTimer = windup;
             if (animator != null) animator.SetTrigger(AnimAttack);
             if (attackTelegraph != null) attackTelegraph.Begin(windup);
+            IncomingAttackWarning.Begin(transform, windup);   // directional "incoming!" tell on the player's HUD
             return true;
         }
 
@@ -350,12 +365,28 @@ namespace Hordebreakers
         public void CancelTelegraph()
         {
             if (attackTelegraph != null) attackTelegraph.Cancel();
+            IncomingAttackWarning.Cancel(transform);
             ReleaseAttackToken();   // aborted wind-up frees the slot
         }
 
         public bool TickTelegraph(float dt)
         {
             FaceTowardPlayer(dt);   // track during the telegraph; the Attack anim plays the wind-up
+            // StandoffLunge: STALK IN during the wind-up so the strike commits from melee range (where the player can
+            // hit back to interrupt it) instead of from the wide orbit ring. Eases to telegraphStrikeRange, then holds.
+            if (_data.archetype == AttackArchetype.StandoffLunge)
+            {
+                float dist = PlanarDist();
+                if (dist > telegraphStrikeRange)
+                {
+                    Vector3 to = _player.position - transform.position; to.y = 0f;
+                    if (to.sqrMagnitude > 0.0001f)
+                    {
+                        float step = Mathf.Min(telegraphStepSpeed * dt, dist - telegraphStrikeRange);
+                        transform.position += to.normalized * step;
+                    }
+                }
+            }
             _stateTimer -= dt;
             return _stateTimer <= 0f;
         }
@@ -374,6 +405,7 @@ namespace Hordebreakers
             Vector3 to = _player.position - transform.position; to.y = 0f;
             _lungeDir = to.sqrMagnitude > 0.001f ? to.normalized : modelRoot.forward;
             modelRoot.rotation = Quaternion.LookRotation(_lungeDir);   // lock the dash direction (committed)
+            IncomingAttackWarning.Cancel(transform);   // wind-up (dodge window) over — the strike is committed now
             _stateTimer = _data.archetype == AttackArchetype.Charger ? _data.chargeTime : _data.lungeTime;
         }
 
@@ -450,6 +482,31 @@ namespace Hordebreakers
         {
             if (_data != null && _data.maxPoise > 0f && _poise < _data.maxPoise)
                 _poise = Mathf.Min(_data.maxPoise, _poise + _data.poiseRegen * dt);
+        }
+
+        /// <summary>
+        /// Arm an engagement dwell on the rising edge of InAttackRange (a rusher just ARRIVED in the ring) so it circles
+        /// the player for a beat before its first telegraph. Called from <see cref="ApproachStep"/> (the graph-driven
+        /// approach verb) so the dwell is set in the SAME tick the body reaches the ring — BEFORE OffCooldown is read.
+        /// The Behavior graph (exec order -50) moves the body in and re-checks OffCooldown all within one tick, so arming
+        /// from Update (order 0) would be a frame too late and the first strike would skip the dwell. Idempotent via
+        /// <see cref="_wasInRange"/>, so the per-frame <see cref="TickEngage"/> call can't double-arm.
+        /// </summary>
+        private void ArmEngageDwell()
+        {
+            if (_data == null) return;
+            bool inRange = _data.archetype == AttackArchetype.StandoffLunge && InAttackRange;
+            if (inRange && !_wasInRange && _data.engageDwell > 0f)
+                _engageDwell = _data.engageDwell * UnityEngine.Random.Range(0.8f, 1.2f);   // circle before the first strike
+            _wasInRange = inRange;
+        }
+
+        /// <summary>Maintain the dwell each frame: catch the arrival edge (covers spawn-in-range) and count it down. Gating
+        /// is via OffCooldown, so both brains keep circling (BT Reposition / FSM RepositionStep) while the dwell holds.</summary>
+        private void TickEngage(float dt)
+        {
+            ArmEngageDwell();
+            if (_engageDwell > 0f) _engageDwell -= dt;
         }
 
         private void TickKnockback(float dt)
@@ -558,10 +615,15 @@ namespace Hordebreakers
             // Poise (weight): a light tap chips the pool but doesn't interrupt — only an emptied pool or a heavy
             // (>= bloodMinDamage) breaks into a real stagger. maxPoise <= 0 = legacy: every hit staggers. The recoil
             // knockback above still lands on an absorbed tap, so a light hit reads as impact without an interrupt.
-            bool staggered = PoiseTracker.Resolve(ref _poise, _data.maxPoise, amount, amount >= bloodMinDamage);
+            // EXCEPTION: an enemy hit while COMMITTED to a strike (it holds an attack token — Husk telegraph->lunge OR
+            // Charger wind-up->dash) is ALWAYS interrupted: you can STUFF its attack by hitting it first. This is the
+            // core melee counterplay. Orbiting taps (no token) still get absorbed by poise. (Dummies never attack.)
+            bool committing = _hasAttackToken && _data.archetype != AttackArchetype.Dummy;
+            bool staggered = PoiseTracker.Resolve(ref _poise, _data.maxPoise, amount, amount >= bloodMinDamage || committing);
             if (!staggered) return;
 
             if (attackTelegraph != null) attackTelegraph.Cancel();   // a real stagger interrupts the wind-up tell
+            IncomingAttackWarning.Cancel(transform);
             if (animator != null)   // flinch toward the hit
             {
                 int dir = HitReaction.Direction(transform.position, modelRoot.forward, modelRoot.right, sourcePos);
@@ -576,6 +638,7 @@ namespace Hordebreakers
         private void Die()
         {
             ReleaseAttackToken();   // free the token if killed mid-attack
+            IncomingAttackWarning.Cancel(transform);   // clear any incoming-attack arrow if killed mid-wind-up
             if (CrowdDirector.Instance != null) CrowdDirector.Instance.Release(_agentId);   // free the ring slot NOW, not after the ~1s death slide
             _hasSlot = false;
             _active = false;

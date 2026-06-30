@@ -31,7 +31,7 @@ MonoBehaviour:
   lungeSpeed: 8
   lungeTime: 0.14
   chargeStartRange: 9
-  chargeWindup: 0.7
+  chargeWindup: 1.1
   chargeSpeed: 16
   chargeTime: 0.55
   chargeDamage: 9

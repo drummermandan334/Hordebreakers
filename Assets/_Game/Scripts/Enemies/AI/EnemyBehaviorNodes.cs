@@ -79,6 +79,7 @@ namespace Hordebreakers
         {
             _body = GameObject != null ? GameObject.GetComponent<IEnemyBody>() : null;
             if (_body == null) return Status.Failure;
+            if (_body.IsStaggered) return Status.Failure;   // never open a wind-up while flinching (the BT brain has no global stagger gate)
             if (!_body.TryStartTelegraph()) return Status.Failure;   // attacker-cap full → bail so the enemy keeps orbiting
             return Status.Running;
         }

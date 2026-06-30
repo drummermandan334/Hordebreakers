@@ -14,6 +14,10 @@ namespace Hordebreakers
     /// player targets) though this pass fills and uses player 0 only. Works for both the FSM and Behavior-graph brains
     /// because the gates it feeds (TryStartTelegraph, RepositionStep) are the shared <see cref="IEnemyBody"/> verbs.
     /// </summary>
+    // Runs before GarrisonDirector (default order 0) so a SCENE-placed CrowdDirector reliably claims Instance first —
+    // otherwise GarrisonDirector.Awake might add a runtime one and the scene object (with the designer's tuned budget/
+    // slot values) would self-destroy on its later Awake. Negative order guarantees "scene-placed one wins".
+    [DefaultExecutionOrder(-100)]
     public sealed class CrowdDirector : MonoBehaviour
     {
         public static CrowdDirector Instance { get; private set; }

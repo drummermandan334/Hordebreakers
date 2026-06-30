@@ -29,6 +29,8 @@ namespace Hordebreakers
         [Tooltip("Where the commander spawns. Defaults to arenaCenter.")]
         [SerializeField] private Transform commanderSpawnPoint;
         [SerializeField] private float spawnRadius = 18f;   // ring fallback when no spawnPoints assigned
+        [Tooltip("Enemies NEVER spawn within this radius (m) of the player — no materializing on top of you. Spawn points closer than this are skipped (falls back to the farthest); the ring fallback pushes to the far side.")]
+        [SerializeField] private float minSpawnDistFromPlayer = 8f;
 
         [Header("Pools")]
         [SerializeField] private int huskPoolSize = 64;
@@ -58,6 +60,8 @@ namespace Hordebreakers
         [Tooltip("Brute reinforcements start from this wave on.")]
         [SerializeField] private int bruteStartWave = 5;
         [Range(0f, 1f)] [SerializeField] private float bruteChance = 0.2f;
+        [Tooltip("Hard cap on Chargers alive at once — they're high-pressure, so a couple is plenty. A charger roll while at the cap falls back to a Husk.")]
+        [SerializeField] private int maxChargers = 2;
 
         private ObjectPool<Enemy> _huskPool;
         private ObjectPool<Brute> _brutePool;
@@ -65,6 +69,7 @@ namespace Hordebreakers
         private Action<Brute> _bruteReturn;
         private readonly List<Enemy> _activeHusks = new List<Enemy>(64);
         private readonly List<Brute> _activeBrutes = new List<Brute>(12);
+        private readonly HashSet<Enemy> _activeChargers = new HashSet<Enemy>();   // subset of _activeHusks (charger reuses the husk pool) — for the on-field charger cap
         private Brute _commander;
 
         private bool _running;
@@ -148,17 +153,19 @@ namespace Hordebreakers
             float bc = (_waveNumber >= bruteStartWave && _brutePool != null) ? bruteChance : 0f;
             float r = UnityEngine.Random.value;
             if (r < bc) SpawnBruteReinforcement();
-            else if (r < bc + cc) SpawnEnemy(chargerData != null ? chargerData : huskData);
-            else SpawnEnemy(huskData);
+            else if (r < bc + cc && chargerData != null && _activeChargers.Count < maxChargers)
+                _activeChargers.Add(SpawnEnemy(chargerData));   // tracked so no more than maxChargers are ever on the field
+            else SpawnEnemy(huskData);   // husk, or a charger roll that hit the cap
             _alive++;
         }
 
-        private void SpawnEnemy(EnemyData data)
+        private Enemy SpawnEnemy(EnemyData data)
         {
             Enemy e = _huskPool.Get();
             e.transform.position = SpawnPos();
             e.Init(data, player, _huskReturn);
             _activeHusks.Add(e);
+            return e;
         }
 
         private void SpawnBruteReinforcement()
@@ -180,17 +187,44 @@ namespace Hordebreakers
 
         private Vector3 SpawnPos()
         {
+            Vector3 pp = player != null ? player.position : arenaCenter.position;
+            float minSq = minSpawnDistFromPlayer * minSpawnDistFromPlayer;
+
             if (spawnPoints != null && spawnPoints.Length > 0)
             {
-                Transform t = spawnPoints[UnityEngine.Random.Range(0, spawnPoints.Length)];
-                if (t != null) return t.position;
+                // Pick a random spawn point that's at least minSpawnDistFromPlayer from the player (scan from a random
+                // start so it's unbiased). If the player is cornered against the perimeter and none qualify, use the
+                // FARTHEST — never spawn on top of the player.
+                int start = UnityEngine.Random.Range(0, spawnPoints.Length);
+                Transform farthest = null; float farSq = -1f;
+                for (int i = 0; i < spawnPoints.Length; i++)
+                {
+                    Transform t = spawnPoints[(start + i) % spawnPoints.Length];
+                    if (t == null) continue;
+                    float dSq = (t.position - pp).sqrMagnitude;
+                    if (dSq >= minSq) return t.position;
+                    if (dSq > farSq) { farSq = dSq; farthest = t; }
+                }
+                if (farthest != null) return farthest.position;
             }
-            Vector2 c = UnityEngine.Random.insideUnitCircle.normalized * spawnRadius;
-            return arenaCenter.position + new Vector3(c.x, 0f, c.y);
+
+            // Ring fallback: a random bearing on the ring; if it lands too close to the player, push it to the bearing
+            // directly opposite the player (far side of the arena) so it's always clear of them.
+            Vector3 center = arenaCenter.position;
+            Vector2 d = UnityEngine.Random.insideUnitCircle.normalized;
+            Vector3 pos = center + new Vector3(d.x, 0f, d.y) * spawnRadius;
+            if ((pos - pp).sqrMagnitude < minSq)
+            {
+                Vector3 away = center - pp; away.y = 0f;
+                away = away.sqrMagnitude > 0.0001f ? away.normalized : Vector3.forward;
+                pos = center + away * spawnRadius;
+            }
+            return pos;
         }
 
         private void ReturnHusk(Enemy e)
         {
+            _activeChargers.Remove(e);   // no-op for a husk; frees a charger slot when a charger dies/despawns
             if (_activeHusks.Remove(e)) _alive = Mathf.Max(0, _alive - 1);
             _huskPool.Return(e);
         }
@@ -207,6 +241,7 @@ namespace Hordebreakers
         {
             for (int i = 0; i < _activeHusks.Count; i++) if (_activeHusks[i] != null) _huskPool.Return(_activeHusks[i]);
             _activeHusks.Clear();
+            _activeChargers.Clear();
             for (int i = 0; i < _activeBrutes.Count; i++) if (_activeBrutes[i] != null) _brutePool.Return(_activeBrutes[i]);
             _activeBrutes.Clear();
             if (_commander != null && _brutePool != null) { _brutePool.Return(_commander); _commander = null; }

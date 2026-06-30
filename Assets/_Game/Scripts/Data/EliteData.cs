@@ -26,6 +26,16 @@ namespace Hordebreakers
         public float slamWindup = 1.1f;     // telegraph duration = the dodge window
         public float slamRecovery = 0.8f;
         public float slamCooldown = 2.5f;
+        [Tooltip("After arriving in slam range the brute CIRCLES the player for this long (randomized +/-20%) before its FIRST slam — a menacing prowl instead of an instant ground-pound. Re-armed each time it re-enters range. 0 = slam as soon as off cooldown.")]
+        public float engageDwell = 1.3f;
+
+        [Header("Circle (prowl around the player between slams)")]
+        [Tooltip("Hold ring as a fraction of slamRange — the brute strafes at this distance while waiting to slam (just inside slam range so the slam still covers the player).")]
+        public float holdRingFraction = 0.92f;
+        [Tooltip("Strafe (circle) speed as a fraction of moveSpeed while prowling.")]
+        public float strafeFraction = 0.55f;
+        [Tooltip("How hard the brute corrects back toward the hold ring while circling.")]
+        public float ringHoldStrength = 0.5f;
 
         [Header("Hit reaction (poise — never flinches mid-slam)")]
         [Tooltip("How long a hit staggers the brute when it's not slamming.")]

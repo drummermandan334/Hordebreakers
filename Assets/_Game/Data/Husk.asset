@@ -24,13 +24,14 @@ MonoBehaviour:
   contactInterval: 1
   contactRange: 1.4
   attackRange: 1.8
-  holdRingMult: 1.15
+  holdRingMult: 1.4
   maxSimultaneousAttackers: 3
-  attackWindup: 0.6
+  engageDwell: 0.9
+  attackWindup: 0.9
   attackRecovery: 0.45
   attackCooldown: 3
-  lungeSpeed: 6
-  lungeTime: 0.25
+  lungeSpeed: 8
+  lungeTime: 0.32
   chargeStartRange: 9
   chargeWindup: 0.7
   chargeSpeed: 16
@@ -42,5 +43,8 @@ MonoBehaviour:
   knockbackPerDamage: 0.3
   deathKnockback: 16
   hitReactTime: 0.12
+  maxPoise: 14
+  poiseRegen: 6
+  staggerDuration: 0.55
   deathDuration: 1.1
   xpValue: 1

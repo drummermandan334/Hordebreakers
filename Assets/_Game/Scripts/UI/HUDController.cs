@@ -32,7 +32,7 @@ namespace Hordebreakers
 
         // Cached last values so the text strings are only rebuilt when something changes (no per-frame GC).
         private int _lastXp = -1, _lastXpToNext = -1, _lastLevel = -1, _lastWave = -1, _lastKills = -1;
-        private int _lastRisk = -1, _lastGWave = -2, _lastWaveSecs = -1;
+        private int _lastRisk = -1, _lastGWave = -2, _lastWaveSecs = -1, _lastObjRound = -1;
 
         private void Start()
         {
@@ -45,6 +45,8 @@ namespace Hordebreakers
             if (encounter != null)
             {
                 encounter.OnArenaCleared += HandleCleared;
+                encounter.OnDemoComplete += HandleComplete;
+                encounter.OnRoundStarted += HandleRoundStarted;
                 encounter.OnPlayerDied += HandleDied;
                 encounter.OnArenaReset += HandleReset;
             }
@@ -56,6 +58,8 @@ namespace Hordebreakers
             if (encounter != null)
             {
                 encounter.OnArenaCleared -= HandleCleared;
+                encounter.OnDemoComplete -= HandleComplete;
+                encounter.OnRoundStarted -= HandleRoundStarted;
                 encounter.OnPlayerDied -= HandleDied;
                 encounter.OnArenaReset -= HandleReset;
             }
@@ -85,8 +89,11 @@ namespace Hordebreakers
             // Arena readouts.
             if (encounter != null)
             {
-                if (objectiveText != null && encounter.Objective != null && objectiveText.text != encounter.Objective.Description)
-                    objectiveText.text = encounter.Objective.Description;
+                if (objectiveText != null && encounter.Objective != null && encounter.Round != _lastObjRound)
+                {
+                    _lastObjRound = encounter.Round;
+                    objectiveText.text = string.Concat("Round ", encounter.Round.ToString(), "/", encounter.RoundCount.ToString(), "   —   ", encounter.Objective.Description);
+                }
 
                 GarrisonDirector g = encounter.Garrison;
                 int secs = g != null ? Mathf.CeilToInt(g.SecondsToNextWave) : 0;
@@ -101,7 +108,9 @@ namespace Hordebreakers
             }
         }
 
-        private void HandleCleared() => ShowPrompt("ARENA CLEARED");
+        private void HandleCleared() => ShowPrompt(string.Concat("ROUND ", encounter != null ? encounter.Round.ToString() : "1", " CLEARED!"));
+        private void HandleComplete() => ShowPrompt("DEMO COMPLETE!");
+        private void HandleRoundStarted(int round) { if (promptText != null) promptText.gameObject.SetActive(false); }
         private void HandleDied() => ShowPrompt("YOU DIED");
         private void HandleReset() { if (promptText != null) promptText.gameObject.SetActive(false); }
 

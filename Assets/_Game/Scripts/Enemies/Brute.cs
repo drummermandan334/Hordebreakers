@@ -48,6 +48,8 @@ namespace Hordebreakers
         [Tooltip("Speed param while moving toward the player, and its blend damping time.")]
         [SerializeField] private float animSpeedMove = 1f;
         [SerializeField] private float animDampMove = 0.15f;
+        [Tooltip("Speed param while circling/prowling around the player (slower than a straight approach).")]
+        [SerializeField] private float animSpeedStrafe = 0.5f;
         [Tooltip("Animator Speed damping time when stopping (stagger).")]
         [SerializeField] private float animDampStop = 0.1f;
 
@@ -76,6 +78,9 @@ namespace Hordebreakers
         private float _poise;          // depletes on hits outside a slam; a break is a real stagger (inactive when data.maxPoise <= 0)
         private int _agentId = -1;     // CrowdDirector handle; -1 = unmanaged
         private bool _hasToken;        // holds a heavy-tell token while slamming (best-effort; the boss always commits)
+        private float _engageDwell;    // > 0 while prowling/circling after arrival, before the first slam is allowed
+        private bool _wasInRange;      // last frame's InAttackRange, to detect arrival (arms the dwell)
+        private float _strafeDir;      // +1 / -1 — which way it circles the player while prowling
         private static readonly Collider[] _sepHits = new Collider[16];
 
         private static readonly int AnimSpeed = Animator.StringToHash("Speed");
@@ -123,6 +128,9 @@ namespace Hordebreakers
             _separationMask = (1 << gameObject.layer) | (player != null ? (1 << player.gameObject.layer) : 0);
             _poise = data.maxPoise;
             _hasToken = false;
+            _engageDwell = 0f;
+            _wasInRange = false;
+            _strafeDir = UnityEngine.Random.value < 0.5f ? -1f : 1f;
             if (CrowdDirector.Instance != null && _agentId < 0) _agentId = CrowdDirector.Instance.Register(this);   // pooled brutes re-register each spawn
             if (_collider != null) _collider.enabled = true;
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
@@ -142,6 +150,7 @@ namespace Hordebreakers
                 if (_cdTimer > 0f) _cdTimer -= dt;
                 if (_staggerTimer > 0f) _staggerTimer -= dt;
                 TickPoise(dt);
+                TickEngage(dt);
                 return;
             }
 
@@ -150,6 +159,7 @@ namespace Hordebreakers
             if (_state == State.Seek) transform.position += Separation() * (data.separationForce * dt);   // separation only while not mid-slam
             if (_cdTimer > 0f) _cdTimer -= dt;
             TickPoise(dt);
+            TickEngage(dt);
             if (_staggerTimer > 0f) { _staggerTimer -= dt; AnimStop(dt); return; }
 
             switch (_state)
@@ -173,6 +183,7 @@ namespace Hordebreakers
         private void OnDisable()
         {
             ReleaseToken();
+            IncomingAttackWarning.Cancel(transform);
             if (_agentId >= 0 && CrowdDirector.Instance != null) CrowdDirector.Instance.Unregister(this);   // frees token + slot, drops from registry
             _agentId = -1;
         }
@@ -203,7 +214,7 @@ namespace Hordebreakers
         // ---------------- IEnemyBody (the body API — driven by both brains) ----------------
         public bool IsStaggered => _staggerTimer > 0f;
         public bool InAttackRange => PlanarDist() <= data.slamRange;
-        public bool OffCooldown => _cdTimer <= 0f;
+        public bool OffCooldown => _cdTimer <= 0f && _engageDwell <= 0f && _staggerTimer <= 0f;   // cooled down, done prowling, not flinching
 
         public void ApproachStep(float dt)
         {
@@ -213,16 +224,25 @@ namespace Hordebreakers
             FaceTowardPlayer(dt);
             if (dist > 0.05f) transform.position += (to / dist) * data.moveSpeed * dt;
             SetAnimSpeed(animSpeedMove, animDampMove, dt);
+            ArmEngageDwell();   // arm the prowl dwell IN the graph tick the instant we reach slam range, BEFORE OffCooldown is read
         }
 
         public void RepositionStep(float dt)
         {
-            // Hold at slam range instead of walking right up to the player — the slam is an AoE at your position, so
-            // it doesn't need to hug. Re-approach only if you've slipped outside slam range.
+            // Prowl: CIRCLE the player at a hold ring (just inside slam range) instead of standing still — a deliberate,
+            // menacing approach rather than a walk-up-and-pound. The slam is an AoE locked onto your position, so circling
+            // at this range still covers you. Re-approach only if you've slipped outside slam range.
             if (_staggerTimer > 0f) { AnimStop(dt); return; }
             if (PlanarDist() > data.slamRange) { ApproachStep(dt); return; }
             FaceTowardPlayer(dt);
-            AnimStop(dt);
+            Vector3 fromPlayer = transform.position - _player.position; fromPlayer.y = 0f;
+            float dist = fromPlayer.magnitude;
+            Vector3 dirFromPlayer = dist > 0.001f ? fromPlayer / dist : modelRoot.forward;
+            float hold = data.slamRange * data.holdRingFraction;
+            Vector3 radialFix = dirFromPlayer * (hold - dist) * data.ringHoldStrength;   // ease toward the hold ring
+            Vector3 tangent = Vector3.Cross(Vector3.up, dirFromPlayer) * _strafeDir;      // orbit the player
+            transform.position += (tangent * data.moveSpeed * data.strafeFraction + radialFix) * dt;
+            SetAnimSpeed(animSpeedStrafe, animDampMove, dt);
         }
 
         public bool TryStartTelegraph()
@@ -235,6 +255,7 @@ namespace Hordebreakers
             _phaseTimer = data.slamWindup;
             if (animator != null) { animator.SetFloat(AnimSpeed, 0f); animator.SetTrigger(AnimAttack); }
             if (attackTelegraph != null) attackTelegraph.Begin(data.slamWindup);   // glow only during the dodge window
+            IncomingAttackWarning.Begin(transform, data.slamWindup);   // directional "incoming slam!" tell on the HUD
             Vector3 d = _slamPoint - transform.position; d.y = 0f;
             if (d.sqrMagnitude > 0.01f) modelRoot.rotation = Quaternion.LookRotation(d);
 
@@ -255,6 +276,7 @@ namespace Hordebreakers
             _slamming = false;
             ReleaseToken();
             if (attackTelegraph != null) attackTelegraph.Cancel();
+            IncomingAttackWarning.Cancel(transform);
             if (_telegraph != null) _telegraph.SetActive(false);
         }
 
@@ -270,6 +292,7 @@ namespace Hordebreakers
         public void StartAttack()
         {
             // The slam strike lands at the telegraphed point (instant); recovery is the Recover phase.
+            IncomingAttackWarning.Cancel(transform);   // wind-up (dodge window) over — the slam lands now
             if (_telegraph != null) _telegraph.SetActive(false);   // telegraph clears at the moment of impact
             if (_player != null && _playerDmg != null && _playerDmg.IsAlive)
             {
@@ -303,6 +326,29 @@ namespace Hordebreakers
         {
             if (data != null && data.maxPoise > 0f && _poise < data.maxPoise)
                 _poise = Mathf.Min(data.maxPoise, _poise + data.poiseRegen * dt);
+        }
+
+        /// <summary>
+        /// Arm a prowl dwell on the rising edge of InAttackRange (the brute just reached slam range) so it circles the
+        /// player for a beat before its first slam. Called from <see cref="ApproachStep"/> (the graph-driven verb) so the
+        /// dwell is set in the SAME tick the body reaches range — BEFORE OffCooldown is read. The Behavior graph (exec
+        /// order -50) moves the body in and re-checks OffCooldown within one tick, so arming from Update (order 0) would
+        /// be a frame too late. Idempotent via <see cref="_wasInRange"/>.
+        /// </summary>
+        private void ArmEngageDwell()
+        {
+            if (data == null) return;
+            bool inRange = InAttackRange;
+            if (inRange && !_wasInRange && data.engageDwell > 0f)
+                _engageDwell = data.engageDwell * UnityEngine.Random.Range(0.8f, 1.2f);   // prowl before the first slam
+            _wasInRange = inRange;
+        }
+
+        /// <summary>Maintain the dwell each frame: catch the arrival edge (covers spawn-in-range) and count it down.</summary>
+        private void TickEngage(float dt)
+        {
+            ArmEngageDwell();
+            if (_engageDwell > 0f) _engageDwell -= dt;
         }
 
         // ---------------- helpers ----------------
@@ -414,6 +460,7 @@ namespace Hordebreakers
         private void Die()
         {
             ReleaseToken();
+            IncomingAttackWarning.Cancel(transform);
             if (CrowdDirector.Instance != null) CrowdDirector.Instance.Release(_agentId);
             _active = false;
             _dying = true;

@@ -16,7 +16,7 @@ MonoBehaviour:
   moveSpeed: 5
   dodgeSpeed: 6
   dodgeDuration: 0.25
-  dodgeIFrames: 0.2
+  dodgeIFrames: 0.6
   dodgeCooldown: 3
   dodgeMaxCharges: 3
   blockMitigation: 0.7
@@ -33,9 +33,9 @@ MonoBehaviour:
   musouDamage: 60
   musouDuration: 1.2
   lightDamage: 8
-  lightReach: 2.2
+  lightReach: 2.7
   heavyDamage: 30
-  heavyReach: 2.6
+  heavyReach: 3.1
   comboChainOpen: 0.75
   minSwingInterval: 0.25
   attackSteerSpeed: 1.5
