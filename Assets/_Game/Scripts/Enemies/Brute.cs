@@ -81,8 +81,11 @@ namespace Hordebreakers
         private float _engageDwell;    // > 0 while prowling/circling after arrival, before the first slam is allowed
         private bool _wasInRange;      // last frame's InAttackRange, to detect arrival (arms the dwell)
         private float _strafeDir;      // +1 / -1 — which way it circles the player while prowling
-        private bool _aggro;           // engaged? false = PASSIVE (idles at spawn). Woken by proximity / damage / a nearby ally's alert.
+        private bool _aggro;           // engaged? false = PASSIVE (patrols its spawn). Woken by proximity / damage / a nearby ally's alert.
         private float _leashTimer;     // counts down while the player is beyond leashRadius; at 0 the elite de-aggros
+        private Vector3 _patrolHome;   // spawn point (or where it last de-aggro'd) — patrol lumbers within patrolRadius of this
+        private Vector3 _patrolTarget; // current patrol destination
+        private float _patrolPauseTimer; // > 0 while pausing at a patrol point
         private static readonly Collider[] _sepHits = new Collider[16];
 
         private static readonly int AnimSpeed = Animator.StringToHash("Speed");
@@ -136,6 +139,9 @@ namespace Hordebreakers
             _strafeDir = UnityEngine.Random.value < 0.5f ? -1f : 1f;
             _aggro = data.aggroRadius <= 0f;   // legacy (<=0) = aggro from spawn; otherwise spawn PASSIVE until alerted
             _leashTimer = data.leashTime;
+            _patrolHome = transform.position;
+            _patrolPauseTimer = UnityEngine.Random.Range(0f, data.patrolPauseMax);   // desync the patrol
+            PickPatrolTarget();
             if (CrowdDirector.Instance != null && _agentId < 0) _agentId = CrowdDirector.Instance.Register(this);   // pooled brutes re-register each spawn
             if (_collider != null) _collider.enabled = true;
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
@@ -226,7 +232,7 @@ namespace Hordebreakers
         public void ApproachStep(float dt)
         {
             if (_staggerTimer > 0f) { AnimStop(dt); return; }
-            if (!_aggro) { AnimStop(dt); return; }   // passive — hold position until engaged
+            if (!_aggro) { PatrolStep(dt); return; }   // passive — amble around the spawn until engaged
             Vector3 to = _player.position - transform.position; to.y = 0f;
             float dist = to.magnitude;
             FaceTowardPlayer(dt);
@@ -372,7 +378,7 @@ namespace Hordebreakers
             }
             if (data.leashRadius > 0f)
             {
-                if (dist > data.leashRadius) { _leashTimer -= dt; if (_leashTimer <= 0f) _aggro = false; }
+                if (dist > data.leashRadius) { _leashTimer -= dt; if (_leashTimer <= 0f) { _aggro = false; _patrolHome = transform.position; PickPatrolTarget(); } }
                 else _leashTimer = data.leashTime;
             }
         }
@@ -402,6 +408,41 @@ namespace Hordebreakers
                 Quaternion target = Quaternion.LookRotation(to);
                 modelRoot.rotation = Quaternion.RotateTowards(modelRoot.rotation, target, data.turnSpeedDeg * dt);
             }
+        }
+
+        /// <summary>Passive: lumber around the spawn home instead of standing frozen (same amble as the chaff, elite-paced). patrolRadius &lt;= 0 = stand still.</summary>
+        private void PatrolStep(float dt)
+        {
+            if (data.patrolRadius <= 0f) { AnimStop(dt); return; }
+            if (_patrolPauseTimer > 0f) { _patrolPauseTimer -= dt; AnimStop(dt); return; }
+            Vector3 to = _patrolTarget - transform.position; to.y = 0f;
+            if (to.sqrMagnitude <= 0.25f)
+            {
+                _patrolPauseTimer = UnityEngine.Random.Range(data.patrolPauseMin, data.patrolPauseMax);
+                PickPatrolTarget();
+                AnimStop(dt);
+                return;
+            }
+            Vector3 dir = to.normalized;
+            transform.position += dir * (data.moveSpeed * data.patrolSpeed * dt);
+            FaceDir(dir, dt);
+            SetAnimSpeed(animSpeedStrafe, animDampMove, dt);
+        }
+
+        /// <summary>Pick a fresh random patrol destination within patrolRadius of the spawn home (XZ plane).</summary>
+        private void PickPatrolTarget()
+        {
+            if (data == null) { _patrolTarget = _patrolHome; return; }
+            Vector2 r = UnityEngine.Random.insideUnitCircle * data.patrolRadius;
+            _patrolTarget = _patrolHome + new Vector3(r.x, 0f, r.y);
+        }
+
+        /// <summary>Turn the model toward an arbitrary heading (patrol uses this; FaceTowardPlayer is for the engaged slam).</summary>
+        private void FaceDir(Vector3 dir, float dt)
+        {
+            if (dir.sqrMagnitude < 0.0001f) return;
+            Quaternion target = Quaternion.LookRotation(dir);
+            modelRoot.rotation = Quaternion.RotateTowards(modelRoot.rotation, target, data.turnSpeedDeg * dt);
         }
 
         private void SetAnimSpeed(float value, float damp, float dt) { if (animator != null) animator.SetFloat(AnimSpeed, value, damp, dt); }

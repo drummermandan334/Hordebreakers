@@ -24,6 +24,10 @@ MonoBehaviour:
   leashRadius: 16
   leashTime: 3
   alertRadius: 5
+  patrolRadius: 4
+  patrolSpeed: 0.4
+  patrolPauseMin: 1
+  patrolPauseMax: 3
   contactDamage: 4
   contactInterval: 1
   contactRange: 1.4
