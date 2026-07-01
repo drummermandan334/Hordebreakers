@@ -29,6 +29,8 @@ namespace Hordebreakers
         [SerializeField] private Animator animator;
         [SerializeField] private HitFlash hitFlash;
         [SerializeField] private AttackTelegraph attackTelegraph;   // wind-up glow tell (auto-found)
+        [Tooltip("Ranged only: transform arrows launch from (the bow/hand). Unset → falls back to a fixed height above the feet (data.shootHeight).")]
+        [SerializeField] private Transform shootOrigin;
         [Tooltip("Hits at/above this damage also splash blood (heavies). Every hit sparks; kills always splash.")]
         [SerializeField] private float bloodMinDamage = 20f;
         [Tooltip("Height above the enemy's feet where the hit spark/blood spawns (~chest).")]
@@ -103,14 +105,18 @@ namespace Hordebreakers
         private float _staggerTimer;   // > 0 while flinching from a hit (movement paused)
         private bool _hasAttackToken;  // true while this rusher holds an attack token (director, or static fallback)
         private int _separationMask;   // enemy + player layers, for crowd separation
+        private int _playerLayerMask;  // player layer only — what a Ranged archer's arrows can hit
         private float _poise;          // depletes on hits; a break is a real stagger (inactive when data.maxPoise <= 0)
         private int _agentId = -1;     // CrowdDirector handle; -1 = unmanaged (solo fallback)
         private bool _hasSlot;         // director assigned us an approach-ring slot
         private float _slotAngleDeg;   // absolute bearing (deg, 0 = +Z) of the assigned slot around the player
         private float _engageDwell;    // > 0 while circling the player after arrival, before the first telegraph is allowed
         private bool _wasInRange;      // last frame's InAttackRange, to detect arrival (the rising edge that arms the dwell)
-        private bool _aggro;           // engaged? false = PASSIVE (idles at spawn, no homing). Woken by proximity / damage / a nearby ally's alert.
+        private bool _aggro;           // engaged? false = PASSIVE (patrols its spawn, no homing). Woken by proximity / damage / a nearby ally's alert.
         private float _leashTimer;     // counts down while the player is beyond leashRadius; at 0 the enemy de-aggros (back to passive)
+        private Vector3 _patrolHome;   // spawn point (or where it last de-aggro'd) — patrol ambles within patrolRadius of this
+        private Vector3 _patrolTarget; // current patrol destination
+        private float _patrolPauseTimer; // > 0 while pausing at a patrol point before the next leg
         private static readonly Collider[] _sepHits = new Collider[16];
         private static int _activeAttackers;   // shared budget fallback when no CrowdDirector is present (StandoffLunge attacker-cap)
 
@@ -145,6 +151,9 @@ namespace Hordebreakers
             if (hitFlash == null) hitFlash = GetComponentInChildren<HitFlash>();
             if (attackTelegraph == null) attackTelegraph = GetComponentInChildren<AttackTelegraph>();
             if (_agent == null) _agent = GetComponent<BehaviorGraphAgent>();
+            // FSM brain: silence the graph agent so it can't ALSO tick the same body (double-drive → 2x move speed,
+            // halved telegraph, doubled arrows). Only the BehaviorTree brain drives through the graph.
+            if (_brain != Brain.BehaviorTree && _agent != null) _agent.enabled = false;
         }
 
         public void Init(EnemyData data, Transform player, Action<Enemy> returnToPool)
@@ -167,6 +176,7 @@ namespace Hordebreakers
             _staggerTimer = 0f;
             _knockback = Vector3.zero;
             _separationMask = (1 << gameObject.layer) | (player != null ? (1 << player.gameObject.layer) : 0);
+            _playerLayerMask = player != null ? (1 << player.gameObject.layer) : 0;
             _poise = data.maxPoise;
             _hasSlot = false;
             _hasAttackToken = false;
@@ -174,6 +184,9 @@ namespace Hordebreakers
             _wasInRange = false;
             _aggro = data.aggroRadius <= 0f;   // legacy (<=0) = aggro from spawn; otherwise spawn PASSIVE until alerted
             _leashTimer = data.leashTime;
+            _patrolHome = transform.position;   // spawn point — patrol ambles around here while passive
+            _patrolPauseTimer = UnityEngine.Random.Range(0f, data.patrolPauseMax);   // desync so the crowd doesn't amble in lockstep
+            PickPatrolTarget();
             if (CrowdDirector.Instance != null && _agentId < 0) _agentId = CrowdDirector.Instance.Register(this);   // pooled agents re-register each spawn
             if (_collider != null) _collider.enabled = true;
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
@@ -272,6 +285,7 @@ namespace Hordebreakers
                 if (_data.archetype == AttackArchetype.Dummy) return false;   // dummies never attack
                 float dist = PlanarDist();
                 if (_data.archetype == AttackArchetype.Charger) return dist <= _data.chargeStartRange;
+                if (_data.archetype == AttackArchetype.Ranged) return dist <= _data.shootRange;   // archer engages anywhere within bow range
                 return dist <= HoldRing + ringApproachBuffer;
             }
         }
@@ -295,6 +309,7 @@ namespace Hordebreakers
             if (_data.archetype == AttackArchetype.Dummy) { FaceTowardPlayer(dt); AnimStop(dt); return; }
             if (!_aggro) { PassiveStep(dt); return; }   // not engaged yet — idle at the perimeter instead of homing in
             if (_data.archetype == AttackArchetype.Charger) { RushStep(dt); return; }
+            if (_data.archetype == AttackArchetype.Ranged) { RushStep(dt); return; }   // out of bow range → close in; the brain halts the approach at shootRange
 
             Vector3 fromPlayer = transform.position - _player.position; fromPlayer.y = 0f;
             float dist = fromPlayer.magnitude;
@@ -317,6 +332,7 @@ namespace Hordebreakers
         {
             if (_staggerTimer > 0f) { AnimStop(dt); return; }
             if (_data.archetype == AttackArchetype.Charger) { ChargerReposition(dt); return; }   // back off to charge range, not point-blank
+            if (_data.archetype == AttackArchetype.Ranged) { KiteStep(dt); return; }   // hold the bow gap; back off if the player crowds in
             if (_data.archetype != AttackArchetype.StandoffLunge) { ApproachStep(dt); return; }   // dummy idles
 
             Vector3 fromPlayer = transform.position - _player.position; fromPlayer.y = 0f;
@@ -342,6 +358,19 @@ namespace Hordebreakers
 
         public bool TryStartTelegraph()
         {
+            // Ranged: NO crowd attack-token. Archers volley (multiple firing at once is intended); cadence is the
+            // per-archer cooldown, not the melee budget. We still set the committing flag so a hit mid-aim STUFFS the
+            // shot (the core "rush the archer" counterplay), and ReleaseAttackToken no-ops the absent director token.
+            if (_data.archetype == AttackArchetype.Ranged)
+            {
+                _hasAttackToken = true;
+                _stateTimer = _data.attackWindup;
+                if (animator != null) animator.SetTrigger(AnimAttack);
+                if (attackTelegraph != null) attackTelegraph.Begin(_data.attackWindup);
+                IncomingAttackWarning.Begin(transform, _data.attackWindup);   // directional "incoming!" tell — dodge the arrow
+                return true;
+            }
+
             // Claim an attack token from the crowd director (denied -> keep orbiting/menacing). The Charger's long tell
             // counts as a "heavy" so two big telegraphs don't crescendo. With no director, fall back to the static
             // rusher cap so solo scenes still behave.
@@ -415,13 +444,27 @@ namespace Hordebreakers
         {
             Vector3 to = _player.position - transform.position; to.y = 0f;
             _lungeDir = to.sqrMagnitude > 0.001f ? to.normalized : modelRoot.forward;
-            modelRoot.rotation = Quaternion.LookRotation(_lungeDir);   // lock the dash direction (committed)
+            modelRoot.rotation = Quaternion.LookRotation(_lungeDir);   // lock the dash/aim direction (committed)
             IncomingAttackWarning.Cancel(transform);   // wind-up (dodge window) over — the strike is committed now
+
+            // Ranged: loose the arrow toward the locked direction and we're done — the projectile flies on its own,
+            // so the player can still side-step it (it's aimed at where you were, not homing). Recovery follows at once.
+            if (_data.archetype == AttackArchetype.Ranged)
+            {
+                // Launch from the bow/hand if wired, else a fixed height above the feet. Keep the flattened aim direction
+                // (_lungeDir) so the shot still travels level toward where the player was — only the origin moves to the bow.
+                Vector3 origin = shootOrigin != null ? shootOrigin.position : transform.position + Vector3.up * _data.shootHeight;
+                EnemyArrows.Fire(origin, _lungeDir, _data.arrowDamage, _data.arrowSpeed, _data.arrowLife, _playerLayerMask);
+                _stateTimer = 0f;
+                return;
+            }
+
             _stateTimer = _data.archetype == AttackArchetype.Charger ? _data.chargeTime : _data.lungeTime;
         }
 
         public bool TickAttack(float dt)
         {
+            if (_data.archetype == AttackArchetype.Ranged) return true;   // arrow was launched in StartAttack — the attack action is over
             bool charger = _data.archetype == AttackArchetype.Charger;
             float speed = charger ? _data.chargeSpeed : _data.lungeSpeed;
             transform.position += _lungeDir * speed * dt;
@@ -520,8 +563,44 @@ namespace Hordebreakers
             if (_engageDwell > 0f) _engageDwell -= dt;
         }
 
-        /// <summary>Passive (not yet engaged): hold position and idle — no homing, no player tracking. Waits to be alerted.</summary>
-        private void PassiveStep(float dt) => AnimStop(dt);
+        /// <summary>
+        /// Passive (not engaged): AMBLE around the spawn home instead of standing frozen — a "living" patrol. Walks to
+        /// random points within patrolRadius of home at a slow pace, pauses, repeats. No player tracking (it's unaware);
+        /// proximity / damage / alert still flips it to aggro via <see cref="UpdateAggro"/>. patrolRadius &lt;= 0 = stand still.
+        /// </summary>
+        private void PassiveStep(float dt)
+        {
+            if (_data.patrolRadius <= 0f) { AnimStop(dt); return; }
+            if (_patrolPauseTimer > 0f) { _patrolPauseTimer -= dt; AnimStop(dt); return; }   // resting at a patrol point
+            Vector3 to = _patrolTarget - transform.position; to.y = 0f;
+            if (to.sqrMagnitude <= 0.25f)   // arrived → pause, then pick the next leg
+            {
+                _patrolPauseTimer = UnityEngine.Random.Range(_data.patrolPauseMin, _data.patrolPauseMax);
+                PickPatrolTarget();
+                AnimStop(dt);
+                return;
+            }
+            Vector3 dir = to.normalized;
+            transform.position += dir * (_data.moveSpeed * _data.patrolSpeed * dt);
+            FaceDir(dir, dt);
+            SetAnimSpeed(animSpeedStrafe, animDampStrafe, dt);   // slow amble (reuses the circle anim speed)
+        }
+
+        /// <summary>Pick a fresh random patrol destination within patrolRadius of the spawn home (XZ plane).</summary>
+        private void PickPatrolTarget()
+        {
+            if (_data == null) { _patrolTarget = _patrolHome; return; }
+            Vector2 r = UnityEngine.Random.insideUnitCircle * _data.patrolRadius;
+            _patrolTarget = _patrolHome + new Vector3(r.x, 0f, r.y);
+        }
+
+        /// <summary>Turn the model toward an arbitrary heading (patrol / kite-retreat use this; FaceTowardPlayer is for engaged enemies).</summary>
+        private void FaceDir(Vector3 dir, float dt)
+        {
+            if (dir.sqrMagnitude < 0.0001f) return;
+            Quaternion target = Quaternion.LookRotation(dir);
+            modelRoot.rotation = Quaternion.RotateTowards(modelRoot.rotation, target, _data.turnSpeedDeg * dt);
+        }
 
         /// <summary>
         /// Drive the passive&lt;-&gt;engaged state (runs for both brains). PASSIVE: wake when the player enters aggroRadius.
@@ -543,7 +622,7 @@ namespace Hordebreakers
                 if (dist > _data.leashRadius)
                 {
                     _leashTimer -= dt;
-                    if (_leashTimer <= 0f) _aggro = false;   // lost interest → back to passive (idles where it stands)
+                    if (_leashTimer <= 0f) { _aggro = false; _patrolHome = transform.position; PickPatrolTarget(); }   // lost interest → patrol from here, don't trek back to spawn
                 }
                 else _leashTimer = _data.leashTime;
             }
@@ -600,6 +679,30 @@ namespace Hordebreakers
                 SetAnimSpeed(animSpeedApproach, animDampApproach, dt);
             }
             else AnimStop(dt);   // at range → hold until off cooldown, then charge
+        }
+
+        // Ranged between shots: keep the bow gap. Crowded (player inside kiteDistance) → turn and flee to regain spacing;
+        // otherwise strafe at range with the bow trained on the player. The locomotion is a 1D forward blend (no backpedal
+        // clip), so the retreat FACES its run direction — the forward-run anim matches the motion (no moonwalk) and it
+        // turns back to aim once it re-opens the gap. (A true backpedal-while-aiming needs a dedicated backward clip.)
+        private void KiteStep(float dt)
+        {
+            Vector3 fromPlayer = transform.position - _player.position; fromPlayer.y = 0f;
+            float dist = fromPlayer.magnitude;
+            Vector3 dirFromPlayer = dist > 0.001f ? fromPlayer / dist : modelRoot.forward;
+            if (dist < _data.kiteDistance)
+            {
+                transform.position += dirFromPlayer * _data.moveSpeed * dt;   // flee outward to regain spacing
+                FaceDir(dirFromPlayer, dt);   // face the way we run so the forward clip reads right (turns back to aim after)
+                SetAnimSpeed(animSpeedApproach, animDampApproach, dt);
+            }
+            else
+            {
+                FaceTowardPlayer(dt);   // at range → keep the bow on the player and sidestep
+                Vector3 tangent = Vector3.Cross(Vector3.up, dirFromPlayer) * _strafeDir;
+                transform.position += tangent * (_data.moveSpeed * strafeSpeedBase) * dt;
+                SetAnimSpeed(animSpeedStrafe, animDampStrafe, dt);
+            }
         }
 
         /// <summary>Hard depenetration from the player's body — kinematic enemies can't be pushed by the player's CharacterController, so we keep ourselves out of it.</summary>

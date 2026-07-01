@@ -7,7 +7,8 @@ namespace Hordebreakers
     {
         StandoffLunge,   // holds a ring around the player, circles, telegraphs a short lunge (the Husk)
         Charger,         // rushes in, telegraphs a long committed dash across the gap (a Tier-2 pressure unit)
-        Dummy            // passive training dummy: stands, faces the player, takes hits — never seeks or attacks
+        Dummy,           // passive training dummy: stands, faces the player, takes hits — never seeks or attacks
+        Ranged           // holds at distance, aims a telegraphed shot, KITES when crowded (the Goblin Archer / Shaman)
     }
 
     /// <summary>Enemy stats. One asset per enemy type (Husk, Charger, ...).</summary>
@@ -40,6 +41,16 @@ namespace Hordebreakers
         public float leashTime = 3f;
         [Tooltip("When this enemy engages, it wakes allies within this radius too, so a cluster engages as one (not one-by-one popcorn). <= 0 = no alert propagation.")]
         public float alertRadius = 5f;
+
+        [Header("Patrol (passive wander around the spawn point, until alerted)")]
+        [Tooltip("Radius (m) the enemy ambles around its spawn point while passive — a living patrol instead of standing frozen. 0 = stand still.")]
+        public float patrolRadius = 4f;
+        [Tooltip("Patrol amble speed as a fraction of moveSpeed (slow, unhurried).")]
+        public float patrolSpeed = 0.4f;
+        [Tooltip("Min pause (s) at each patrol point before ambling to the next.")]
+        public float patrolPauseMin = 1f;
+        [Tooltip("Max pause (s) at each patrol point.")]
+        public float patrolPauseMax = 3f;
 
         [Header("Contact damage (strike)")]
         public float contactDamage = 5f;
@@ -79,6 +90,20 @@ namespace Hordebreakers
         public float chargeRecovery = 0.9f;
         [Tooltip("The charge connects when it sweeps within this distance of the player (mid-dash, not just at the end).")]
         public float chargeHitRadius = 1.3f;
+
+        [Header("Ranged (used when archetype = Ranged) — reuses attackWindup (aim draw) / attackRecovery / attackCooldown")]
+        [Tooltip("The archer holds at distance and shoots when the player is within this range (also its 'in range' gate). Big — it's a ranged threat.")]
+        public float shootRange = 12f;
+        [Tooltip("If the player closes inside this, the archer BACKS AWAY (kites) instead of holding — keeps its distance.")]
+        public float kiteDistance = 5f;
+        [Tooltip("Arrow flight speed (m/s). Slow enough to read + dodge after the aim telegraph.")]
+        public float arrowSpeed = 16f;
+        [Tooltip("Arrow lifetime (s) before it despawns if it hits nothing.")]
+        public float arrowLife = 2.5f;
+        [Tooltip("Damage per arrow.")]
+        public float arrowDamage = 7f;
+        [Tooltip("Height (m) above the archer's feet the arrow launches from (~the bow).")]
+        public float shootHeight = 1.2f;
 
         [Header("Hit reaction")]
         [Tooltip("Base recoil impulse (m/s) when struck — adds weight to the player's hits.")]
