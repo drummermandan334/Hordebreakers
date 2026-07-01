@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c76e8bca0ef64ec48b1e0fa5c81c9bc2, type: 3}
+  m_Name: GoblinArcher
+  m_EditorClassIdentifier: Hordebreakers::Hordebreakers.EnemyData
+  archetype: 3
+  maxHp: 10
+  moveSpeed: 3.2
+  turnSpeedDeg: 480
+  separationRadius: 0.7
+  separationForce: 6
+  playerSpacing: 0.6
+  guardBreaks: 0
+  aggroRadius: 14
+  leashRadius: 22
+  leashTime: 4
+  alertRadius: 6
+  contactDamage: 4
+  contactInterval: 1
+  contactRange: 1.4
+  attackRange: 1.8
+  holdRingMult: 1.6
+  maxSimultaneousAttackers: 3
+  engageDwell: 0.9
+  attackWindup: 0.7
+  attackRecovery: 0.5
+  attackCooldown: 2.2
+  lungeSpeed: 8
+  lungeTime: 0.14
+  chargeStartRange: 9
+  chargeWindup: 0.7
+  chargeSpeed: 16
+  chargeTime: 0.55
+  chargeDamage: 14
+  chargeRecovery: 0.9
+  chargeHitRadius: 1.3
+  shootRange: 12
+  kiteDistance: 5
+  arrowSpeed: 16
+  arrowLife: 2.5
+  arrowDamage: 7
+  shootHeight: 1.2
+  knockback: 4
+  knockbackPerDamage: 0.4
+  deathKnockback: 14
+  hitReactTime: 0.3
+  maxPoise: 6
+  poiseRegen: 5
+  staggerDuration: 0.5
+  deathDuration: 1.1
+  xpValue: 2

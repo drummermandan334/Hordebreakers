@@ -16,9 +16,13 @@ namespace Hordebreakers
     {
         [Header("Refs")]
         [SerializeField] private Enemy huskPrefab;
+        [Tooltip("Goblin Archer (Ranged) — its own prefab/pool: different model + animator than the Husk.")]
+        [SerializeField] private Enemy archerPrefab;
         [SerializeField] private Brute brutePrefab;
         [SerializeField] private EnemyData huskData;
         [SerializeField] private EnemyData chargerData;
+        [Tooltip("Ranged archetype stats for the Goblin Archer.")]
+        [SerializeField] private EnemyData archerData;
         [SerializeField] private EliteData bruteData;       // regular Brute reinforcement
         [SerializeField] private EliteData commanderData;   // beefed Brute = the win target
         [SerializeField] private Transform player;
@@ -34,6 +38,7 @@ namespace Hordebreakers
 
         [Header("Pools")]
         [SerializeField] private int huskPoolSize = 64;
+        [SerializeField] private int archerPoolSize = 16;
         [SerializeField] private int brutePoolSize = 12;
 
         [Header("Waves (the finite garrison)")]
@@ -62,12 +67,20 @@ namespace Hordebreakers
         [Range(0f, 1f)] [SerializeField] private float bruteChance = 0.2f;
         [Tooltip("Hard cap on Chargers alive at once — they're high-pressure, so a couple is plenty. A charger roll while at the cap falls back to a Husk.")]
         [SerializeField] private int maxChargers = 2;
+        [Tooltip("Goblin Archers (Ranged) start appearing from this wave on.")]
+        [SerializeField] private int archerStartWave = 2;
+        [Range(0f, 1f)] [SerializeField] private float archerChance = 0.3f;
+        [Tooltip("Hard cap on Archers alive at once — ranged pressure; a handful is plenty. An archer roll while at the cap falls back to a Husk.")]
+        [SerializeField] private int maxArchers = 4;
 
         private ObjectPool<Enemy> _huskPool;
+        private ObjectPool<Enemy> _archerPool;
         private ObjectPool<Brute> _brutePool;
         private Action<Enemy> _huskReturn;
+        private Action<Enemy> _archerReturn;
         private Action<Brute> _bruteReturn;
         private readonly List<Enemy> _activeHusks = new List<Enemy>(64);
+        private readonly List<Enemy> _activeArchers = new List<Enemy>(16);
         private readonly List<Brute> _activeBrutes = new List<Brute>(12);
         private readonly HashSet<Enemy> _activeChargers = new HashSet<Enemy>();   // subset of _activeHusks (charger reuses the husk pool) — for the on-field charger cap
         private Brute _commander;
@@ -94,6 +107,7 @@ namespace Hordebreakers
             if (player == null) { GameObject p = GameObject.FindGameObjectWithTag("Player"); if (p != null) player = p.transform; }
             if (CrowdDirector.Instance == null) gameObject.AddComponent<CrowdDirector>();   // the crowd brain enemies coordinate through (scene-placed one wins)
             if (huskPrefab != null) { _huskPool = new ObjectPool<Enemy>(huskPrefab, huskPoolSize, transform); _huskReturn = ReturnHusk; }
+            if (archerPrefab != null) { _archerPool = new ObjectPool<Enemy>(archerPrefab, archerPoolSize, transform); _archerReturn = ReturnArcher; }
             if (brutePrefab != null) { _brutePool = new ObjectPool<Brute>(brutePrefab, brutePoolSize, transform); _bruteReturn = ReturnBrute; }
         }
 
@@ -151,11 +165,14 @@ namespace Hordebreakers
         {
             float cc = _waveNumber >= chargerStartWave ? chargerChance : 0f;
             float bc = (_waveNumber >= bruteStartWave && _brutePool != null) ? bruteChance : 0f;
+            float ac = (_waveNumber >= archerStartWave && _archerPool != null && archerData != null) ? archerChance : 0f;
             float r = UnityEngine.Random.value;
             if (r < bc) SpawnBruteReinforcement();
             else if (r < bc + cc && chargerData != null && _activeChargers.Count < maxChargers)
                 _activeChargers.Add(SpawnEnemy(chargerData));   // tracked so no more than maxChargers are ever on the field
-            else SpawnEnemy(huskData);   // husk, or a charger roll that hit the cap
+            else if (r < bc + cc + ac && _activeArchers.Count < maxArchers)
+                SpawnArcher();   // tracked so no more than maxArchers are ever on the field
+            else SpawnEnemy(huskData);   // husk, or a charger/archer roll that hit its cap
             _alive++;
         }
 
@@ -166,6 +183,14 @@ namespace Hordebreakers
             e.Init(data, player, _huskReturn);
             _activeHusks.Add(e);
             return e;
+        }
+
+        private void SpawnArcher()
+        {
+            Enemy a = _archerPool.Get();
+            a.transform.position = SpawnPos();
+            a.Init(archerData, player, _archerReturn);
+            _activeArchers.Add(a);
         }
 
         private void SpawnBruteReinforcement()
@@ -229,6 +254,12 @@ namespace Hordebreakers
             _huskPool.Return(e);
         }
 
+        private void ReturnArcher(Enemy e)
+        {
+            if (_activeArchers.Remove(e)) _alive = Mathf.Max(0, _alive - 1);
+            _archerPool.Return(e);
+        }
+
         private void ReturnBrute(Brute b)
         {
             if (b == _commander) _commander = null;                       // commander wasn't counted in _alive
@@ -242,6 +273,11 @@ namespace Hordebreakers
             for (int i = 0; i < _activeHusks.Count; i++) if (_activeHusks[i] != null) _huskPool.Return(_activeHusks[i]);
             _activeHusks.Clear();
             _activeChargers.Clear();
+            if (_archerPool != null)
+            {
+                for (int i = 0; i < _activeArchers.Count; i++) if (_activeArchers[i] != null) _archerPool.Return(_activeArchers[i]);
+                _activeArchers.Clear();
+            }
             for (int i = 0; i < _activeBrutes.Count; i++) if (_activeBrutes[i] != null) _brutePool.Return(_activeBrutes[i]);
             _activeBrutes.Clear();
             if (_commander != null && _brutePool != null) { _brutePool.Return(_commander); _commander = null; }

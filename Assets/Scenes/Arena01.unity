@@ -2510,6 +2510,52 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 454930, guid: 196b993d2b0354842bd6fa90eb970550, type: 3}
   m_PrefabInstance: {fileID: 672004072}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &687642123
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 687642125}
+  - component: {fileID: 687642124}
+  m_Layer: 0
+  m_Name: EnemyArrows
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &687642124
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 687642123}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 06c476aaf1a37414bb21fd3e3841ced2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hordebreakers::Hordebreakers.EnemyArrows
+  _arrowPrefab: {fileID: 8225853077513384334, guid: fecf9450a973af24ba97501f94f05389, type: 3}
+  _poolSize: 24
+--- !u!4 &687642125
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 687642123}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &705229015
 GameObject:
   m_ObjectHideFlags: 0
@@ -6353,9 +6399,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hordebreakers::Hordebreakers.GarrisonDirector
   huskPrefab: {fileID: 1482134068124445769, guid: b79449c6fa239cc40a41890361daf610, type: 3}
+  archerPrefab: {fileID: 3795514101001270784, guid: 8da94860e8be0f2409d4cc0d338aaaa3, type: 3}
   brutePrefab: {fileID: 294695954849416385, guid: 58ee0cc5284db7f4c980dd78dd9c305a, type: 3}
   huskData: {fileID: 11400000, guid: 2f10c4d98ee69844d824ff2db879f24f, type: 2}
   chargerData: {fileID: 11400000, guid: ee1fe5814b1e1044e864224df1864bc6, type: 2}
+  archerData: {fileID: 11400000, guid: 9ce76327922abe94996774f8643f25c1, type: 2}
   bruteData: {fileID: 11400000, guid: e1adb07eab54db64d955ccb110fc5da3, type: 2}
   commanderData: {fileID: 11400000, guid: 247eb3f7d147bef498a17db8925a82e2, type: 2}
   player: {fileID: 0}
@@ -6373,6 +6421,7 @@ MonoBehaviour:
   spawnRadius: 18
   minSpawnDistFromPlayer: 8
   huskPoolSize: 64
+  archerPoolSize: 16
   brutePoolSize: 12
   waveCount: 8
   commanderWave: 6
@@ -6387,6 +6436,9 @@ MonoBehaviour:
   bruteStartWave: 5
   bruteChance: 0.2
   maxChargers: 2
+  archerStartWave: 2
+  archerChance: 0.3
+  maxArchers: 4
 --- !u!4 &1635233891
 Transform:
   m_ObjectHideFlags: 0
@@ -8622,3 +8674,4 @@ SceneRoots:
   - {fileID: 929990836}
   - {fileID: 1635233891}
   - {fileID: 1996522945}
+  - {fileID: 687642125}

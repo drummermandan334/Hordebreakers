@@ -30,7 +30,8 @@
 ## 🤖 Enemy AI / roster (behavior-tree foundation landed → the payoff)
 - [ ] **Tune the regular Brute reinforcements** — only the *commander's* slam was shrunk; `BruteData`'s slam is still big.
 - [ ] **Per-race variants** (goblin / undead / dwarf / elf…) — `EnemyData` variants on the existing archetype graph + signature quirks as data-gated branches. *Synty goblin/etc. anim packs already imported — teed up.*
-- [ ] **New archetypes** — a ranged enemy, and a real commander/boss archetype with its own moveset (right now it's just a beefed Brute).
+- [ ] **New archetypes** — ~~a ranged enemy~~ *(Goblin Archer — kite + shoot — BUILT on `ranged-archetype`)*, and a real commander/boss archetype with its own moveset (right now it's just a beefed Brute).
+  - [ ] ⚠️ **Ranged arrows use a PLAYER-ONLY hit mask** (`EnemyArrows.Fire` → `Projectile` SphereCast) — arrows pass through the enemy crowd *and* through any world geometry. Fine in open Arena01, but **the mask must gain the world/obstacle layers once cover exists**, or archers will shoot straight through walls. (No LoS check either — add one with cover.)
 - [ ] **Enemy attack audio / feedback** — enemies are silent on telegraph / lunge / slam; add SFX + maybe a sharper tell.
 - [ ] **Delete the FSM fallback** from `Enemy`/`Brute` once the BehaviorTree brain is fully trusted (dead code behind the Brain toggle).
 - [ ] *(Later)* refactor the shared **telegraph → commit → recover** spine into a Unity Behavior **subgraph** if the roster grows.
