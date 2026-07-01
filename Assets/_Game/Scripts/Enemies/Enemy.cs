@@ -15,7 +15,7 @@ namespace Hordebreakers
     /// (movement application, separation, clamp, knockback, hit-feel, death) live here regardless of brain.
     /// </summary>
     [RequireComponent(typeof(CapsuleCollider))]
-    public class Enemy : MonoBehaviour, IDamageable, IEnemyBody, ICrowdAgent
+    public class Enemy : MonoBehaviour, IDamageable, IEnemyBody, ICrowdAgent, ITargetInfo
     {
         private enum State { Seek, Windup, Lunge, Recover }
         private enum Brain { FSM, BehaviorTree }
@@ -117,7 +117,17 @@ namespace Hordebreakers
         private Vector3 _patrolHome;   // spawn point (or where it last de-aggro'd) — patrol ambles within patrolRadius of this
         private Vector3 _patrolTarget; // current patrol destination
         private float _patrolPauseTimer; // > 0 while pausing at a patrol point before the next leg
+        private bool _moraleBroken;      // Goblin Morale: true while routed (cowering/fleeing) — gates attacks off, drives FleeStep
+        private float _moraleTimer;      // > 0 while a break is committed; at 0 it re-checks the pack and rallies or re-breaks
+        private float _moraleCheckTimer; // throttles the nearby-ally scan (a few times a second), desynced per instance
+        private const float MoraleCheckInterval = 0.2f;
+        // Shaman support: transient timed buffs layered on top of the shared _data asset (never mutate the asset itself).
+        private float _hasteTimer;  private float _hasteMult = 1f;    // Haste  → move speed ×mult
+        private float _enrageTimer; private float _enrageMult = 1f;   // Enrage → outgoing damage ×mult
+        private float _wardTimer;   private float _wardMult = 1f;     // Ward   → incoming damage ×mult
         private static readonly Collider[] _sepHits = new Collider[16];
+        private static readonly Collider[] _wallHits = new Collider[8];
+        private int _obstacleMask;      // walls/props to depenetrate from (kinematic bodies ignore colliders): all layers except this enemy's + the player's
         private static int _activeAttackers;   // shared budget fallback when no CrowdDirector is present (StandoffLunge attacker-cap)
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -131,12 +141,17 @@ namespace Hordebreakers
 
         public bool IsAlive => _active && _hp > 0f;
 
+        // ---- ITargetInfo (HUD nameplate) ----
+        public string TargetName => _data != null && !string.IsNullOrEmpty(_data.displayName) ? _data.displayName : "Enemy";
+        public float TargetHp => _hp;
+        public float TargetHpMax => _data != null ? _data.maxHp : 1f;
+
         // ---- ICrowdAgent (crowd-coordination hooks the CrowdDirector reads) ----
         public int AgentId => _agentId;
         public Transform AgentTransform => transform;
         // Ring-waiters are the standoff rushers; chargers rush in and dummies don't fight, so they don't hold a slot.
         // Passive (un-engaged) rushers don't claim a slot either — they're idling at the perimeter, not circling the player.
-        public bool WantsSlot => _active && !_dying && _aggro && _data != null && _data.archetype == AttackArchetype.StandoffLunge;
+        public bool WantsSlot => _active && !_dying && _aggro && !_moraleBroken && _data != null && _data.archetype == AttackArchetype.StandoffLunge;
         public float Aggression => _aggression;
         public void AssignSlotAngle(float deg) { _slotAngleDeg = deg; _hasSlot = true; }
         public void ClearSlot() => _hasSlot = false;
@@ -154,6 +169,9 @@ namespace Hordebreakers
             // FSM brain: silence the graph agent so it can't ALSO tick the same body (double-drive → 2x move speed,
             // halved telegraph, doubled arrows). Only the BehaviorTree brain drives through the graph.
             if (_brain != Brain.BehaviorTree && _agent != null) _agent.enabled = false;
+            _obstacleMask = ~(1 << gameObject.layer);   // walls/props are everything except our own layer...
+            int playerLayer = LayerMask.NameToLayer("Player");
+            if (playerLayer >= 0) _obstacleMask &= ~(1 << playerLayer);   // ...and the player (ClampOutOfPlayer handles that)
         }
 
         public void Init(EnemyData data, Transform player, Action<Enemy> returnToPool)
@@ -186,6 +204,11 @@ namespace Hordebreakers
             _leashTimer = data.leashTime;
             _patrolHome = transform.position;   // spawn point — patrol ambles around here while passive
             _patrolPauseTimer = UnityEngine.Random.Range(0f, data.patrolPauseMax);   // desync so the crowd doesn't amble in lockstep
+            _moraleBroken = false;
+            _moraleTimer = 0f;
+            _moraleCheckTimer = UnityEngine.Random.Range(0f, MoraleCheckInterval);   // desync the pack's morale scans
+            _hasteTimer = _enrageTimer = _wardTimer = 0f;                            // clear any buff carried across a pool reuse
+            _hasteMult = _enrageMult = _wardMult = 1f;
             PickPatrolTarget();
             if (CrowdDirector.Instance != null && _agentId < 0) _agentId = CrowdDirector.Instance.Register(this);   // pooled agents re-register each spawn
             if (_collider != null) _collider.enabled = true;
@@ -208,6 +231,8 @@ namespace Hordebreakers
                 if (_staggerTimer > 0f) _staggerTimer -= dt;
                 TickPoise(dt);
                 UpdateAggro(dt);   // resolve aggro BEFORE the dwell — the dwell's InAttackRange check depends on _aggro
+                TickMorale(dt);    // Goblin cowardice: break/rally the pack (gates attacks off + drives FleeStep while broken)
+                TickStatus(dt);    // Shaman buffs (haste/enrage/ward) tick down
                 TickEngage(dt);
                 return;
             }
@@ -221,6 +246,8 @@ namespace Hordebreakers
             if (_cooldownTimer > 0f) _cooldownTimer -= dt;
             TickPoise(dt);
             UpdateAggro(dt);   // resolve aggro BEFORE the dwell — the dwell's InAttackRange check depends on _aggro
+            TickMorale(dt);    // Goblin cowardice: break/rally the pack (gates attacks off + drives FleeStep while broken)
+            TickStatus(dt);    // Shaman buffs (haste/enrage/ward) tick down
             TickEngage(dt);
             if (_staggerTimer > 0f) { _staggerTimer -= dt; AnimStop(dt); return; }
 
@@ -231,6 +258,7 @@ namespace Hordebreakers
                 case State.Lunge:   FsmLunge(dt);   break;
                 case State.Recover: FsmRecover(dt); break;
             }
+            BlockAgainstWalls();   // kinematic bodies ignore wall colliders — push out of anything walked into
         }
 
         private void LateUpdate()
@@ -240,6 +268,7 @@ namespace Hordebreakers
             TickKnockback(dt);
             if (_data.archetype != AttackArchetype.Dummy) transform.position += Separation() * (_data.separationForce * dt);
             ClampOutOfPlayer();
+            BlockAgainstWalls();
         }
 
         private void OnDisable()
@@ -282,6 +311,7 @@ namespace Hordebreakers
             get
             {
                 if (!_aggro) return false;   // passive (un-engaged): never "in range" → the brain idles via ApproachStep, never attacks
+                if (_moraleBroken) return false;   // routed: never "in range" → the brain falls to ApproachStep, which flees
                 if (_data.archetype == AttackArchetype.Dummy) return false;   // dummies never attack
                 float dist = PlanarDist();
                 if (_data.archetype == AttackArchetype.Charger) return dist <= _data.chargeStartRange;
@@ -294,6 +324,7 @@ namespace Hordebreakers
         {
             get
             {
+                if (_moraleBroken) return false;   // routed → never opens a wind-up
                 if (_cooldownTimer > 0f) return false;
                 if (_staggerTimer > 0f) return false;   // flinching → don't open a new wind-up (the BT brain has no global stagger gate)
                 if (_engageDwell > 0f) return false;   // freshly arrived — circle a beat before the first strike
@@ -308,6 +339,7 @@ namespace Hordebreakers
             if (_staggerTimer > 0f) { AnimStop(dt); return; }
             if (_data.archetype == AttackArchetype.Dummy) { FaceTowardPlayer(dt); AnimStop(dt); return; }
             if (!_aggro) { PassiveStep(dt); return; }   // not engaged yet — idle at the perimeter instead of homing in
+            if (_moraleBroken) { FleeStep(dt); return; }   // routed — scramble away from the player instead of closing in
             if (_data.archetype == AttackArchetype.Charger) { RushStep(dt); return; }
             if (_data.archetype == AttackArchetype.Ranged) { RushStep(dt); return; }   // out of bow range → close in; the brain halts the approach at shootRange
 
@@ -321,7 +353,7 @@ namespace Hordebreakers
             Vector3 ringDir = _hasSlot ? SlotDir() : Quaternion.Euler(0f, _slotOffset, 0f) * dirFromPlayer;
             Vector3 ringTarget = _player.position + ringDir * HoldRing;
             Vector3 toTarget = ringTarget - transform.position; toTarget.y = 0f;
-            Vector3 step = toTarget.normalized * _data.moveSpeed * dt;
+            Vector3 step = toTarget.normalized * EffMoveSpeed * dt;
             if (step.sqrMagnitude > toTarget.sqrMagnitude) step = toTarget;
             transform.position += step;
             SetAnimSpeed(animSpeedApproach, animDampApproach, dt);
@@ -331,6 +363,7 @@ namespace Hordebreakers
         public void RepositionStep(float dt)
         {
             if (_staggerTimer > 0f) { AnimStop(dt); return; }
+            if (_moraleBroken) { FleeStep(dt); return; }   // routed — flee rather than hold the ring
             if (_data.archetype == AttackArchetype.Charger) { ChargerReposition(dt); return; }   // back off to charge range, not point-blank
             if (_data.archetype == AttackArchetype.Ranged) { KiteStep(dt); return; }   // hold the bow gap; back off if the player crowds in
             if (_data.archetype != AttackArchetype.StandoffLunge) { ApproachStep(dt); return; }   // dummy idles
@@ -352,7 +385,7 @@ namespace Hordebreakers
                 strafeDir = Mathf.Abs(delta) > 3f ? Mathf.Sign(delta) : 0f;   // settle at the slot, don't jitter
             }
             Vector3 tangent = Vector3.Cross(Vector3.up, dirFromPlayer) * strafeDir;
-            transform.position += (tangent * _data.moveSpeed * strafe + radialFix) * dt;
+            transform.position += (tangent * EffMoveSpeed * strafe + radialFix) * dt;
             SetAnimSpeed(animSpeedStrafe, animDampStrafe, dt);
         }
 
@@ -435,6 +468,7 @@ namespace Hordebreakers
         {
             get
             {
+                if (_moraleBroken) return true;   // routed mid-wind-up → drop the attack (aborts the graph-brain's TelegraphAction)
                 if (_data.archetype != AttackArchetype.StandoffLunge) return false;   // chargers/brutes commit
                 return PlanarDist() > (_standoff + ringApproachBuffer) * telegraphAbortReachMult;   // rusher: player escaped
             }
@@ -442,6 +476,7 @@ namespace Hordebreakers
 
         public void StartAttack()
         {
+            if (_moraleBroken) { _stateTimer = 0f; return; }   // routed between wind-up and strike → no lunge/arrow (TickAttack ends it at once)
             Vector3 to = _player.position - transform.position; to.y = 0f;
             _lungeDir = to.sqrMagnitude > 0.001f ? to.normalized : modelRoot.forward;
             modelRoot.rotation = Quaternion.LookRotation(_lungeDir);   // lock the dash/aim direction (committed)
@@ -454,7 +489,7 @@ namespace Hordebreakers
                 // Launch from the bow/hand if wired, else a fixed height above the feet. Keep the flattened aim direction
                 // (_lungeDir) so the shot still travels level toward where the player was — only the origin moves to the bow.
                 Vector3 origin = shootOrigin != null ? shootOrigin.position : transform.position + Vector3.up * _data.shootHeight;
-                EnemyArrows.Fire(origin, _lungeDir, _data.arrowDamage, _data.arrowSpeed, _data.arrowLife, _playerLayerMask);
+                EnemyArrows.Fire(origin, _lungeDir, _data.arrowDamage * _enrageMult, _data.arrowSpeed, _data.arrowLife, _playerLayerMask);
                 _stateTimer = 0f;
                 return;
             }
@@ -478,7 +513,7 @@ namespace Hordebreakers
                 float hitRadius = charger ? _data.chargeHitRadius : _data.contactRange;
                 if (toP.magnitude <= hitRadius)
                 {
-                    float dmg = charger ? _data.chargeDamage : _data.contactDamage;
+                    float dmg = (charger ? _data.chargeDamage : _data.contactDamage) * _enrageMult;
                     _playerDmg.TakeDamage(dmg, transform.position, _data.guardBreaks);
                     return true;   // connected → done
                 }
@@ -510,6 +545,9 @@ namespace Hordebreakers
 
         /// <summary>The engagement/strafe ring (StandoffLunge): the tight standoff distance widened by holdRingMult so the crowd circles in a bigger ring. The lunge-connect stays based on the tight _standoff.</summary>
         private float HoldRing => _standoff * (_data != null ? _data.holdRingMult : 1f);
+
+        /// <summary>Move speed with the transient Shaman Haste buff applied (1× when unbuffed; never mutates _data).</summary>
+        private float EffMoveSpeed => _data.moveSpeed * _hasteMult;
 
         private void FaceTowardPlayer(float dt)
         {
@@ -581,7 +619,7 @@ namespace Hordebreakers
                 return;
             }
             Vector3 dir = to.normalized;
-            transform.position += dir * (_data.moveSpeed * _data.patrolSpeed * dt);
+            transform.position += dir * (EffMoveSpeed * _data.patrolSpeed * dt);
             FaceDir(dir, dt);
             SetAnimSpeed(animSpeedStrafe, animDampStrafe, dt);   // slow amble (reuses the circle anim speed)
         }
@@ -638,6 +676,86 @@ namespace Hordebreakers
                 CrowdDirector.Instance.AlertNear(transform.position, _data.alertRadius, _agentId);
         }
 
+        /// <summary>
+        /// Goblin Morale (data-gated cowardice): brave in a pack, gutless alone. While engaged, throttle-scan nearby
+        /// living allies; drop below moraleMinAllies and morale BREAKS — the goblin drops its attack token/slot and flees
+        /// for moraleBreakSeconds, then re-checks: reinforced (allies back up) → re-rally and rejoin the fight; still
+        /// isolated → keep cowering. The break gates InAttackRange/OffCooldown off and routes ApproachStep/RepositionStep
+        /// to FleeStep, so it works for BOTH brains. Elites/bosses leave hasMorale off (they never run — that reads as
+        /// "the big ones are the real threat"). Clears the instant it de-aggros (a routed goblin that escapes calms down).
+        /// </summary>
+        private void TickMorale(float dt)
+        {
+            if (_data == null || !_data.hasMorale || !_aggro) { _moraleBroken = false; return; }
+
+            if (_moraleBroken)
+            {
+                _moraleTimer -= dt;
+                if (_moraleTimer > 0f) return;                                  // still cowering — re-check when it runs out
+                if (NearbyAllies() >= _data.moraleMinAllies) _moraleBroken = false;   // reinforced → rally back in
+                else _moraleTimer = _data.moraleBreakSeconds;                   // still alone → keep fleeing
+                return;
+            }
+
+            _moraleCheckTimer -= dt;                                            // throttle the ally scan (desynced per instance)
+            if (_moraleCheckTimer > 0f) return;
+            _moraleCheckTimer = MoraleCheckInterval;
+            if (NearbyAllies() < _data.moraleMinAllies) BreakMorale();
+        }
+
+        /// <summary>Living allies within moraleRadius (via the director's non-alloc scan). No director (solo test scene) → treat as a full pack so morale never breaks.</summary>
+        private int NearbyAllies() => CrowdDirector.Instance != null
+            ? CrowdDirector.Instance.CountAllyNear(transform.position, _data.moraleRadius, _agentId)
+            : int.MaxValue;
+
+        /// <summary>Commit a morale break: cancel any wind-up, free the attack token + ring slot, and start the flee timer.</summary>
+        private void BreakMorale()
+        {
+            _moraleBroken = true;
+            _moraleTimer = _data.moraleBreakSeconds;
+            if (attackTelegraph != null) attackTelegraph.Cancel();
+            IncomingAttackWarning.Cancel(transform);
+            ReleaseAttackToken();
+            if (CrowdDirector.Instance != null) CrowdDirector.Instance.Release(_agentId);   // give up the ring slot too
+            _hasSlot = false;
+            _state = State.Seek;   // FSM: bail out of any wind-up / lunge in progress
+        }
+
+        /// <summary>Morale-broken: scramble directly away from the player (panicked rout) at a boosted pace, facing the run
+        /// direction so the forward-run clip reads. Reuses the same 1D locomotion blend as the kite/patrol retreat.</summary>
+        private void FleeStep(float dt)
+        {
+            Vector3 away = transform.position - _player.position; away.y = 0f;
+            Vector3 dir = away.sqrMagnitude > 0.0001f ? away.normalized : modelRoot.forward;
+            transform.position += dir * (EffMoveSpeed * _data.moraleFleeSpeedMult * dt);
+            FaceDir(dir, dt);
+            SetAnimSpeed(animSpeedApproach, animDampApproach, dt);
+        }
+
+        // ---------------- Shaman support (transient buffs) ----------------
+        /// <summary>Apply a timed Shaman buff (a multiplier layered over the shared _data — never mutates the asset). Latest application refreshes.</summary>
+        public void ApplyStatus(EnemyStatusKind kind, float duration, float mult)
+        {
+            if (!_active || duration <= 0f) return;
+            switch (kind)
+            {
+                case EnemyStatusKind.Haste:  _hasteTimer = duration;  _hasteMult = mult;  break;
+                case EnemyStatusKind.Enrage: _enrageTimer = duration; _enrageMult = mult; break;
+                case EnemyStatusKind.Ward:   _wardTimer = duration;   _wardMult = mult;   break;
+            }
+        }
+
+        /// <summary>Shaman rally: yank a broken goblin back into the fight (a nearby caster re-emboldens the routed pack).</summary>
+        public void RallyMorale() { _moraleBroken = false; _moraleTimer = 0f; }
+
+        /// <summary>Tick down the active buffs; each resets its multiplier to 1 when it expires. Runs for both brains.</summary>
+        private void TickStatus(float dt)
+        {
+            if (_hasteTimer > 0f)  { _hasteTimer  -= dt; if (_hasteTimer  <= 0f) _hasteMult  = 1f; }
+            if (_enrageTimer > 0f) { _enrageTimer -= dt; if (_enrageTimer <= 0f) _enrageMult = 1f; }
+            if (_wardTimer > 0f)   { _wardTimer   -= dt; if (_wardTimer   <= 0f) _wardMult   = 1f; }
+        }
+
         private void TickKnockback(float dt)
         {
             if (_knockback.sqrMagnitude > 0.0001f)
@@ -663,7 +781,7 @@ namespace Hordebreakers
             Vector3 to = _player.position - transform.position; to.y = 0f;
             float dist = to.magnitude;
             FaceTowardPlayer(dt);
-            if (dist > 0.05f) transform.position += (to / dist) * _data.moveSpeed * dt;
+            if (dist > 0.05f) transform.position += (to / dist) * EffMoveSpeed * dt;
             SetAnimSpeed(animSpeedApproach, animDampApproach, dt);
         }
 
@@ -675,7 +793,7 @@ namespace Hordebreakers
             if (PlanarDist() < hold)
             {
                 Vector3 away = transform.position - _player.position; away.y = 0f;
-                if (away.sqrMagnitude > 0.01f) transform.position += away.normalized * _data.moveSpeed * dt;
+                if (away.sqrMagnitude > 0.01f) transform.position += away.normalized * EffMoveSpeed * dt;
                 SetAnimSpeed(animSpeedApproach, animDampApproach, dt);
             }
             else AnimStop(dt);   // at range → hold until off cooldown, then charge
@@ -692,7 +810,7 @@ namespace Hordebreakers
             Vector3 dirFromPlayer = dist > 0.001f ? fromPlayer / dist : modelRoot.forward;
             if (dist < _data.kiteDistance)
             {
-                transform.position += dirFromPlayer * _data.moveSpeed * dt;   // flee outward to regain spacing
+                transform.position += dirFromPlayer * EffMoveSpeed * dt;   // flee outward to regain spacing
                 FaceDir(dirFromPlayer, dt);   // face the way we run so the forward clip reads right (turns back to aim after)
                 SetAnimSpeed(animSpeedApproach, animDampApproach, dt);
             }
@@ -700,7 +818,7 @@ namespace Hordebreakers
             {
                 FaceTowardPlayer(dt);   // at range → keep the bow on the player and sidestep
                 Vector3 tangent = Vector3.Cross(Vector3.up, dirFromPlayer) * _strafeDir;
-                transform.position += tangent * (_data.moveSpeed * strafeSpeedBase) * dt;
+                transform.position += tangent * (EffMoveSpeed * strafeSpeedBase) * dt;
                 SetAnimSpeed(animSpeedStrafe, animDampStrafe, dt);
             }
         }
@@ -712,6 +830,31 @@ namespace Hordebreakers
             float min = _data != null ? _data.playerSpacing : 0.6f;
             float d = toEnemy.magnitude;
             if (d > 0.0001f && d < min) transform.position += toEnemy / d * (min - d);
+        }
+
+        /// <summary>Depenetrate the body out of any wall/prop it has walked into — kinematic enemies move by transform and
+        /// otherwise pass straight through colliders. Horizontal only (never shoved up/down); runs after all movement.</summary>
+        private void BlockAgainstWalls()
+        {
+            if (_collider == null) return;
+            float r = _collider.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z);
+            float halfH = Mathf.Max(_collider.height * 0.5f * transform.lossyScale.y, r);
+            Vector3 center = transform.TransformPoint(_collider.center);
+            Vector3 up = transform.up;
+            Vector3 p0 = center + up * (halfH - r);
+            Vector3 p1 = center - up * (halfH - r);
+            int n = Physics.OverlapCapsuleNonAlloc(p0, p1, r, _wallHits, _obstacleMask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                Collider w = _wallHits[i];
+                if (w == _collider) continue;
+                if (Physics.ComputePenetration(_collider, transform.position, transform.rotation,
+                                               w, w.transform.position, w.transform.rotation, out Vector3 dir, out float dist))
+                {
+                    dir.y = 0f;   // stay on the ground plane
+                    transform.position += dir * dist;
+                }
+            }
         }
 
         /// <summary>Passive training-dummy tick (FSM brain): face the player, never move/attack. Stands where knocked so the recoil stays readable.</summary>
@@ -750,7 +893,9 @@ namespace Hordebreakers
         public void TakeDamage(float amount, Vector3 sourcePos)
         {
             if (!_active) return;
+            TargetNameplate.ReportHit(this);   // player struck this unit → HUD nameplate focuses it
             Aggro(true);   // getting hit always engages it (and wakes nearby allies) — you can't poke a passive enemy for free
+            if (_wardMult != 1f) amount *= _wardMult;   // Shaman Ward: soak a fraction of incoming damage (scales hp + poise + knockback together)
             _hp -= amount;
             if (hitFlash != null) hitFlash.Flash();
             CombatAudio.PlayHit(transform.position);   // impact thunk (clips live on CombatAudio)

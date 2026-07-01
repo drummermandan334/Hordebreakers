@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a5feaae11790392488c043871db5efda, type: 3}
+  m_Name: TrollData
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.EliteData
+  displayName: Troll
+  maxHp: 220
+  moveSpeed: 1.9
+  turnSpeedDeg: 160
+  separationRadius: 1.3
+  separationForce: 6
+  guardBreaks: 1
+  aggroRadius: 13
+  leashRadius: 20
+  leashTime: 4
+  alertRadius: 7
+  patrolRadius: 3
+  patrolSpeed: 0.35
+  patrolPauseMin: 1.5
+  patrolPauseMax: 4
+  slamRange: 4.5
+  slamRadius: 4.2
+  slamDamage: 32
+  slamWindup: 1.5
+  slamRecovery: 1
+  slamCooldown: 2.8
+  engageDwell: 1.4
+  holdRingFraction: 0.9
+  strafeFraction: 0.45
+  ringHoldStrength: 0.5
+  hitReactTime: 0.12
+  maxPoise: 120
+  poiseRegen: 12
+  staggerDuration: 0.7
+  deathDuration: 1.8
+  deathKnockback: 8
+  xpValue: 18

@@ -6,6 +6,8 @@ namespace Hordebreakers
     [CreateAssetMenu(fileName = "EliteData", menuName = "Hordebreakers/Elite Data")]
     public class EliteData : ScriptableObject
     {
+        [Tooltip("Name shown on the target nameplate when the player attacks/locks this unit.")]
+        public string displayName = "Brute";
         [Header("Stats")]
         public float maxHp = 120f;
         public float moveSpeed = 2.2f;

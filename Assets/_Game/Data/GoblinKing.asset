@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b0551da7a0be4c2e8f13d9c4e77a1b02, type: 3}
+  m_Name: GoblinKing
+  m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.BossData
+  displayName: Goblin King
+  maxHp: 400
+  moveSpeed: 3
+  turnSpeedDeg: 300
+  separationRadius: 1
+  separationForce: 6
+  playerSpacing: 0.7
+  guardBreaks: 1
+  aggroRadius: 80
+  leashRadius: 0
+  leashTime: 4
+  alertRadius: 8
+  patrolRadius: 0
+  patrolSpeed: 0.4
+  patrolPauseMin: 1.5
+  patrolPauseMax: 4
+  engageDwell: 0.8
+  holdRingFraction: 0.85
+  strafeFraction: 0.6
+  ringHoldStrength: 0.5
+  globalCooldown: 1.3
+  initialCooldown: 1
+  slamRange: 3.2
+  slamRadius: 3.2
+  slamDamage: 24
+  slamWindup: 1
+  slamRecovery: 0.9
+  chargeMinRange: 6
+  chargeWindup: 0.9
+  chargeSpeed: 14
+  chargeTime: 0.5
+  chargeDamage: 20
+  chargeHitRadius: 1.5
+  chargeRecovery: 1.1
+  cleaveRange: 2.8
+  cleaveHalfAngleDeg: 60
+  cleaveDamage: 18
+  cleaveWindup: 0.8
+  cleaveRecovery: 0.8
+  cleaveChance: 0.4
+  enrageHpFraction: 0.2
+  enrageSpeedMult: 0.75
+  enrageDamageMult: 1.2
+  hasCommanderPhase: 1
+  commanderUntilHpFraction: 0.6
+  commanderCastInterval: 4
+  commanderSummonCount: 3
+  commanderSummonRadius: 4
+  commanderHoldRange: 9
+  commanderBoltDamage: 10
+  commanderBoltSpeed: 12
+  hitReactTime: 0.12
+  maxPoise: 70
+  poiseRegen: 12
+  staggerDuration: 0.6
+  deathDuration: 2.2
+  deathKnockback: 5
+  xpValue: 80

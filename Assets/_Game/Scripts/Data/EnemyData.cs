@@ -17,6 +17,8 @@ namespace Hordebreakers
     {
         [Header("Archetype")]
         public AttackArchetype archetype = AttackArchetype.StandoffLunge;
+        [Tooltip("Name shown on the target nameplate when the player attacks/locks this unit.")]
+        public string displayName = "Enemy";
         [Header("Stats")]
         public float maxHp = 12f;
         public float moveSpeed = 3f;
@@ -51,6 +53,20 @@ namespace Hordebreakers
         public float patrolPauseMin = 1f;
         [Tooltip("Max pause (s) at each patrol point.")]
         public float patrolPauseMax = 3f;
+
+        [Header("Morale (Goblin cowardice — data-gated; leave OFF for elites/bosses so the big ones never run)")]
+        [Tooltip("Enables the morale break: brave in a pack, gutless alone. Chaff goblins ON; Troll/Ork/King OFF.")]
+        public bool hasMorale = false;
+        [Tooltip("Radius (m) it counts living allies within to decide whether it's still in a pack.")]
+        public float moraleRadius = 6f;
+        [Tooltip("Fewer than this many nearby allies (isolated / pack thinned) → morale breaks. HIGHER = breaks more easily (needs a bigger pack to stay brave). Grunt breaks easiest.")]
+        public int moraleMinAllies = 2;
+        [Tooltip("Seconds a broken goblin cowers/flees before it re-checks and can re-rally.")]
+        public float moraleBreakSeconds = 2.5f;
+        [Tooltip("Flee speed while broken, as a multiplier on moveSpeed (a panicked scramble away from the player).")]
+        public float moraleFleeSpeedMult = 1.3f;
+        [Tooltip("v0.1: the ~4x/sec ally scan already catches a nearby ally dying within a quarter second, so a big ally's death routs the pack; kept as a dial for a future instant-panic broadcast.")]
+        public bool moralePanicOnAllyDeath = true;
 
         [Header("Contact damage (strike)")]
         public float contactDamage = 5f;

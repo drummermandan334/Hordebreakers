@@ -146,6 +146,36 @@ namespace Hordebreakers
             }
         }
 
+        /// <summary>
+        /// Count managed agents alive within <paramref name="radius"/> of <paramref name="pos"/> (excluding
+        /// <paramref name="exceptId"/>). Powers the goblin Morale check ("am I still in a pack?") — the same
+        /// allocation-free scan as <see cref="AlertNear"/>, so it counts husks / archers / brutes alike regardless
+        /// of physics layers. Callers throttle it (a few times a second), so the O(n) scan is cheap.
+        /// </summary>
+        public int CountAllyNear(Vector3 pos, float radius, int exceptId)
+        {
+            if (radius <= 0f)
+            {
+                return 0;
+            }
+            float rSq = radius * radius;
+            int count = 0;
+            for (int i = 0; i < _agents.Count; i++)
+            {
+                ICrowdAgent a = _agents[i];
+                if (a == null || !a.IsAlive || a.AgentId == exceptId || a.AgentTransform == null)
+                {
+                    continue;
+                }
+                Vector3 to = a.AgentTransform.position - pos; to.y = 0f;
+                if (to.sqrMagnitude <= rSq)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
         /// <summary>Pull-model token request: an agent calls this at the instant it commits an attack. True = granted.</summary>
         public bool TryBeginAttack(int agentId, int cost, bool heavyTell) => _control != null && _control.TryAcquireToken(agentId, cost, heavyTell);
 

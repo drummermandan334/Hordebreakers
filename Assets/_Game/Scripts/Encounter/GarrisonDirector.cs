@@ -23,8 +23,15 @@ namespace Hordebreakers
         [SerializeField] private EnemyData chargerData;
         [Tooltip("Ranged archetype stats for the Goblin Archer.")]
         [SerializeField] private EnemyData archerData;
+        [Tooltip("Goblin Shaman (Ranged + ShamanAbilities support) — its own prefab/pool.")]
+        [SerializeField] private Enemy shamanPrefab;
+        [Tooltip("Ranged archetype stats for the Goblin Shaman.")]
+        [SerializeField] private EnemyData shamanData;
         [SerializeField] private EliteData bruteData;       // regular Brute reinforcement
-        [SerializeField] private EliteData commanderData;   // beefed Brute = the win target
+        [SerializeField] private EliteData commanderData;   // beefed Brute = the win target (fallback when no Ork boss is assigned)
+        [Tooltip("Ork Champion (Boss archetype). When BOTH this and bossData are set, the Ork REPLACES the Brute commander as the boss / win target.")]
+        [SerializeField] private BossEnemy bossPrefab;
+        [SerializeField] private BossData bossData;
         [SerializeField] private Transform player;
         [Tooltip("Perimeter spawn points. If empty, falls back to a ring around arenaCenter at spawnRadius.")]
         [SerializeField] private Transform[] spawnPoints;
@@ -39,6 +46,7 @@ namespace Hordebreakers
         [Header("Pools")]
         [SerializeField] private int huskPoolSize = 64;
         [SerializeField] private int archerPoolSize = 16;
+        [SerializeField] private int shamanPoolSize = 4;
         [SerializeField] private int brutePoolSize = 12;
 
         [Header("Waves (the finite garrison)")]
@@ -72,18 +80,29 @@ namespace Hordebreakers
         [Range(0f, 1f)] [SerializeField] private float archerChance = 0.3f;
         [Tooltip("Hard cap on Archers alive at once — ranged pressure; a handful is plenty. An archer roll while at the cap falls back to a Husk.")]
         [SerializeField] private int maxArchers = 4;
+        [Tooltip("Goblin Shamans (Ranged support caster: buffs/summons/re-rallies the pack) start appearing from this wave on.")]
+        [SerializeField] private int shamanStartWave = 3;
+        [Range(0f, 1f)] [SerializeField] private float shamanChance = 0.15f;
+        [Tooltip("Hard cap on Shamans alive at once — a support caster; one or two is plenty. A shaman roll while at the cap falls back to a Husk.")]
+        [SerializeField] private int maxShamans = 2;
 
         private ObjectPool<Enemy> _huskPool;
         private ObjectPool<Enemy> _archerPool;
+        private ObjectPool<Enemy> _shamanPool;
         private ObjectPool<Brute> _brutePool;
         private Action<Enemy> _huskReturn;
         private Action<Enemy> _archerReturn;
+        private Action<Enemy> _shamanReturn;
         private Action<Brute> _bruteReturn;
         private readonly List<Enemy> _activeHusks = new List<Enemy>(64);
         private readonly List<Enemy> _activeArchers = new List<Enemy>(16);
+        private readonly List<Enemy> _activeShamans = new List<Enemy>(4);
         private readonly List<Brute> _activeBrutes = new List<Brute>(12);
         private readonly HashSet<Enemy> _activeChargers = new HashSet<Enemy>();   // subset of _activeHusks (charger reuses the husk pool) — for the on-field charger cap
         private Brute _commander;
+        private ObjectPool<BossEnemy> _bossPool;
+        private Action<BossEnemy> _bossReturn;
+        private BossEnemy _boss;   // the Ork Champion, when assigned (replaces the Brute commander)
 
         private bool _running;
         private int _alive;             // reinforcements alive (commander excluded)
@@ -94,21 +113,45 @@ namespace Hordebreakers
 
         // ---- read by the objective + HUD ----
         public bool CommanderSpawned { get; private set; }
-        public bool CommanderAlive => _commander != null && _commander.IsAlive;
+        public bool CommanderAlive => (_commander != null && _commander.IsAlive) || (_boss != null && _boss.IsAlive);
         public int AliveCount => _alive;
         public int WaveNumber => _waveNumber;
         public int WaveCount => waveCount;
         public float SecondsToNextWave => _waveNumber < waveCount ? Mathf.Max(0f, _waveTimer) : 0f;
         public bool AllWavesDone => _waveNumber >= waveCount;
 
+        /// <summary>Single authoritative instance so summoners (Shaman / Goblin King) can spawn adds via <see cref="SpawnGoblinAt"/>.</summary>
+        public static GarrisonDirector Instance { get; private set; }
+
         private void Awake()
         {
+            Instance = this;
             if (arenaCenter == null) arenaCenter = transform;
             if (player == null) { GameObject p = GameObject.FindGameObjectWithTag("Player"); if (p != null) player = p.transform; }
             if (CrowdDirector.Instance == null) gameObject.AddComponent<CrowdDirector>();   // the crowd brain enemies coordinate through (scene-placed one wins)
             if (huskPrefab != null) { _huskPool = new ObjectPool<Enemy>(huskPrefab, huskPoolSize, transform); _huskReturn = ReturnHusk; }
             if (archerPrefab != null) { _archerPool = new ObjectPool<Enemy>(archerPrefab, archerPoolSize, transform); _archerReturn = ReturnArcher; }
+            if (shamanPrefab != null) { _shamanPool = new ObjectPool<Enemy>(shamanPrefab, shamanPoolSize, transform); _shamanReturn = ReturnShaman; }
             if (brutePrefab != null) { _brutePool = new ObjectPool<Brute>(brutePrefab, brutePoolSize, transform); _bruteReturn = ReturnBrute; }
+            if (bossPrefab != null) { _bossPool = new ObjectPool<BossEnemy>(bossPrefab, 1, transform); _bossReturn = ReturnBoss; }
+        }
+
+        private void OnDestroy() { if (Instance == this) Instance = null; }
+
+        /// <summary>
+        /// Spawn a single chaff goblin (the husk pool) at a world position — for Shaman / Goblin King summons. Routes
+        /// through the normal husk path so it's tracked in _alive + _activeHusks (counts toward the objective + the cap),
+        /// and returns to the pool on death like any other. Respects maxAlive; returns null if the field is full.
+        /// </summary>
+        public Enemy SpawnGoblinAt(Vector3 pos)
+        {
+            if (_huskPool == null || huskData == null || _alive >= maxAlive) return null;
+            Enemy e = _huskPool.Get();
+            e.transform.position = pos;
+            e.Init(huskData, player, _huskReturn);
+            _activeHusks.Add(e);
+            _alive++;
+            return e;
         }
 
         /// <summary>(Re)start the encounter: clear any active enemies, reset the wave clock, spawn the commander, run.</summary>
@@ -166,13 +209,16 @@ namespace Hordebreakers
             float cc = _waveNumber >= chargerStartWave ? chargerChance : 0f;
             float bc = (_waveNumber >= bruteStartWave && _brutePool != null) ? bruteChance : 0f;
             float ac = (_waveNumber >= archerStartWave && _archerPool != null && archerData != null) ? archerChance : 0f;
+            float sc = (_waveNumber >= shamanStartWave && _shamanPool != null && shamanData != null) ? shamanChance : 0f;
             float r = UnityEngine.Random.value;
             if (r < bc) SpawnBruteReinforcement();
             else if (r < bc + cc && chargerData != null && _activeChargers.Count < maxChargers)
                 _activeChargers.Add(SpawnEnemy(chargerData));   // tracked so no more than maxChargers are ever on the field
             else if (r < bc + cc + ac && _activeArchers.Count < maxArchers)
                 SpawnArcher();   // tracked so no more than maxArchers are ever on the field
-            else SpawnEnemy(huskData);   // husk, or a charger/archer roll that hit its cap
+            else if (r < bc + cc + ac + sc && _activeShamans.Count < maxShamans)
+                SpawnShaman();   // tracked so no more than maxShamans are ever on the field
+            else SpawnEnemy(huskData);   // husk, or a charger/archer/shaman roll that hit its cap
             _alive++;
         }
 
@@ -193,6 +239,14 @@ namespace Hordebreakers
             _activeArchers.Add(a);
         }
 
+        private void SpawnShaman()
+        {
+            Enemy s = _shamanPool.Get();
+            s.transform.position = SpawnPos();
+            s.Init(shamanData, player, _shamanReturn);
+            _activeShamans.Add(s);
+        }
+
         private void SpawnBruteReinforcement()
         {
             Brute b = _brutePool.Get();
@@ -203,11 +257,29 @@ namespace Hordebreakers
 
         private void SpawnCommander()
         {
+            Vector3 pos = commanderSpawnPoint != null ? commanderSpawnPoint.position : arenaCenter.position;
+
+            // Ork Champion (Boss archetype) is the boss when assigned; otherwise fall back to the beefed-Brute commander.
+            if (_bossPool != null && bossData != null)
+            {
+                _boss = _bossPool.Get();
+                _boss.transform.position = pos;
+                _boss.Init(player, _bossReturn, bossData);
+                CommanderSpawned = true;
+                return;
+            }
+
             if (_brutePool == null) { CommanderSpawned = false; return; }
             _commander = _brutePool.Get();
-            _commander.transform.position = commanderSpawnPoint != null ? commanderSpawnPoint.position : arenaCenter.position;
+            _commander.transform.position = pos;
             _commander.Init(player, _bruteReturn, commanderData != null ? commanderData : bruteData);
             CommanderSpawned = true;
+        }
+
+        private void ReturnBoss(BossEnemy b)
+        {
+            if (b == _boss) _boss = null;   // the boss isn't counted in _alive
+            if (_bossPool != null) _bossPool.Return(b);
         }
 
         private Vector3 SpawnPos()
@@ -260,6 +332,12 @@ namespace Hordebreakers
             _archerPool.Return(e);
         }
 
+        private void ReturnShaman(Enemy e)
+        {
+            if (_activeShamans.Remove(e)) _alive = Mathf.Max(0, _alive - 1);
+            _shamanPool.Return(e);
+        }
+
         private void ReturnBrute(Brute b)
         {
             if (b == _commander) _commander = null;                       // commander wasn't counted in _alive
@@ -278,9 +356,15 @@ namespace Hordebreakers
                 for (int i = 0; i < _activeArchers.Count; i++) if (_activeArchers[i] != null) _archerPool.Return(_activeArchers[i]);
                 _activeArchers.Clear();
             }
+            if (_shamanPool != null)
+            {
+                for (int i = 0; i < _activeShamans.Count; i++) if (_activeShamans[i] != null) _shamanPool.Return(_activeShamans[i]);
+                _activeShamans.Clear();
+            }
             for (int i = 0; i < _activeBrutes.Count; i++) if (_activeBrutes[i] != null) _brutePool.Return(_activeBrutes[i]);
             _activeBrutes.Clear();
             if (_commander != null && _brutePool != null) { _brutePool.Return(_commander); _commander = null; }
+            if (_boss != null && _bossPool != null) { _bossPool.Return(_boss); _boss = null; }
             CommanderSpawned = false;
             _alive = 0;
         }

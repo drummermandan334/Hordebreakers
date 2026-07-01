@@ -1,0 +1,411 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &2237852204534312440
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3471592034771435354}
+  - component: {fileID: 1825999560770405970}
+  - component: {fileID: 6293802747077913438}
+  - component: {fileID: 182263454347415153}
+  - component: {fileID: 8395884365857195917}
+  - component: {fileID: 5487790912440326512}
+  - component: {fileID: 3795514101001270784}
+  - component: {fileID: 6513493247796956760}
+  m_Layer: 8
+  m_Name: GoblinShaman
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3471592034771435354
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2237852204534312440}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 8605728828937344626}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!136 &1825999560770405970
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2237852204534312440}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.2685244
+  m_Height: 1.9489182
+  m_Direction: 1
+  m_Center: {x: 0.0032081604, y: 0.8121852, z: -0.025308698}
+--- !u!54 &6293802747077913438
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2237852204534312440}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 112
+  m_CollisionDetection: 0
+--- !u!114 &182263454347415153
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2237852204534312440}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0038c16c34866b4f9e25c9c0dc0f7e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Behavior::Unity.Behavior.BehaviorGraphAgent
+  m_Graph: {fileID: 7646971231589391875, guid: 6c62ade094a3cff4394b11914f00422b, type: 2}
+  m_BlackboardVariableOverridesList: []
+  m_OriginalGraph: {fileID: 0}
+  m_IsInitialised: 0
+  m_IsStarted: 0
+  references:
+    version: 2
+    RefIds: []
+--- !u!114 &8395884365857195917
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2237852204534312440}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4cde4ed0edf828449c943101ffecb10, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hordebreakers::Hordebreakers.HitFlash
+  flashColor: {r: 1, g: 0.3, b: 0.3, a: 1}
+  flashDuration: 0.09
+  emissionIntensity: 3.5
+  scalePunch: 0.12
+  punchTarget: {fileID: 0}
+--- !u!114 &5487790912440326512
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2237852204534312440}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afd79dcc4b240c548ac4c1d9ee1afad9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hordebreakers::Hordebreakers.AttackTelegraph
+  telegraphColor: {r: 1, g: 0.45, b: 0.1, a: 1}
+  emissionIntensity: 2.6
+  pulseHz: 5
+  scalePulse: 0.05
+  pulseTarget: {fileID: 0}
+--- !u!114 &3795514101001270784
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2237852204534312440}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8a9924d7eb0fae4d97f51b2df072e59, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hordebreakers::Hordebreakers.Enemy
+  _brain: 0
+  _agent: {fileID: 182263454347415153}
+  modelRoot: {fileID: 8605728828937344626}
+  animator: {fileID: 2417760179838503944}
+  hitFlash: {fileID: 0}
+  attackTelegraph: {fileID: 0}
+  shootOrigin: {fileID: 3196474850569885838}
+  bloodMinDamage: 20
+  hitFxHeight: 1
+  standoffRangeBase: 1.35
+  standoffRangeAggressionSlope: 0.6
+  attackCooldownBase: 1.4
+  attackCooldownAggressionSlope: 0.8
+  initialCooldownMin: 0.3
+  slotOffsetRange: 35
+  knockbackDecayRate: 12
+  ringApproachBuffer: 0.4
+  ringHoldStrength: 0.6
+  strafeSpeedBase: 0.3
+  strafeSpeedAggressionScale: 0.35
+  telegraphAbortReachMult: 1.5
+  telegraphStrikeRange: 1.7
+  telegraphStepSpeed: 4
+  chargerHoldFraction: 0.8
+  animSpeedApproach: 1
+  animDampApproach: 0.12
+  animSpeedStrafe: 0.45
+  animDampStrafe: 0.15
+  animDampStop: 0.1
+  fallbackDeathDuration: 1.1
+--- !u!114 &6513493247796956760
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2237852204534312440}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a5f8f0ef86733d546b83e13841063e8e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hordebreakers::Hordebreakers.ShamanAbilities
+  castInterval: 4
+  firstCastDelay: 2
+  activationRange: 20
+  buffRadius: 8
+  buffDuration: 6
+  hasteMult: 1.4
+  enrageMult: 1.5
+  wardMult: 0.6
+  buffMaxTargets: 6
+  hexSlowMult: 0.6
+  hexDuration: 3
+  summonCount: 2
+  summonRadius: 3
+  allyMask:
+    serializedVersion: 2
+    m_Bits: 256
+--- !u!1 &7786944479942337055
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3196474850569885838}
+  - component: {fileID: 796962549543390291}
+  - component: {fileID: 3279872946768800327}
+  m_Layer: 0
+  m_Name: Bow
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &3196474850569885838
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7786944479942337055}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.33339614, y: 0.7070392, z: 0.37411547, w: -0.49897918}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4944726326663854712}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!33 &796962549543390291
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7786944479942337055}
+  m_Mesh: {fileID: -3820973853771624318, guid: 5a12ba8a9ca30a148a02b4d3eb5baeb6, type: 3}
+--- !u!23 &3279872946768800327
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7786944479942337055}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1001 &3266591067206326406
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 3471592034771435354}
+    m_Modifications:
+    - target: {fileID: 582214566319344467, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 925735285564101774, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 22100000, guid: 477b5d47680520d438c24159041d1dd6, type: 2}
+    - target: {fileID: 925735285564101774, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_WarningMessage
+      value: "\nBinding warning: Some generic clip(s) animate transforms that are
+        already bound by a Humanoid avatar. These transforms can only be changed
+        by Humanoid clips.\n\tTransform 'Toes_L'\n\tTransform 'Toes_R'\n\tTransform
+        'Toes_L'\n\tTransform 'Toes_R'\n\tTransform 'Toes_L'\n\tTransform 'Toes_R'\n\tFrom
+        animation clip 'A_POLY_GBL_Walk_F_Neut'\n\tFrom animation clip 'A_Death_B_01_Sword'\n\tFrom
+        animation clip 'A_POLY_BOW_Stand_Aiming_ToDrawn_Neut'\n\tFrom animation clip
+        'A_Hit_F_React_Sword'\n\tFrom animation clip 'A_Hit_B_React_Sword'\n\tFrom
+        animation clip 'A_Hit_L_React_Sword'\n\tFrom animation clip 'A_Hit_R_React_Sword'"
+      objectReference: {fileID: 0}
+    - target: {fileID: 3611690002759004382, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5044942133492500517, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.5785476
+      objectReference: {fileID: 0}
+    - target: {fileID: 5044942133492500517, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.35251343
+      objectReference: {fileID: 0}
+    - target: {fileID: 5869073421947262030, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_Name
+      value: Model
+      objectReference: {fileID: 0}
+    - target: {fileID: 6501213805562433268, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6501213805562433268, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6501213805562433268, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6501213805562433268, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6501213805562433268, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6501213805562433268, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6501213805562433268, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6501213805562433268, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6501213805562433268, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6501213805562433268, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 7623029709837574910, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3196474850569885838}
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+--- !u!95 &2417760179838503944 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 925735285564101774, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+  m_PrefabInstance: {fileID: 3266591067206326406}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &4944726326663854712 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7623029709837574910, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+  m_PrefabInstance: {fileID: 3266591067206326406}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &8605728828937344626 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6501213805562433268, guid: fda39ba8f61246149bbade559e6dd7ec, type: 3}
+  m_PrefabInstance: {fileID: 3266591067206326406}
+  m_PrefabAsset: {fileID: 0}
