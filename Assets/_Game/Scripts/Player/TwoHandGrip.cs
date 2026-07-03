@@ -41,7 +41,14 @@ namespace Hordebreakers
         [Tooltip("Only align during Attack-tagged states — locomotion/idle sometimes swings the off hand near the shaft.")]
         [SerializeField] private bool attackStatesOnly = true;
 
-        private Transform _leftHand;
+        [Header("Left grip point")]
+        [Tooltip("Aim the shaft at the left PALM (middle-finger base) instead of the wrist bone. The wrist sits ~10cm behind where the fingers actually wrap, so aiming there makes the shaft ride the forearm/wrist.")]
+        [SerializeField] private bool aimAtPalm = true;
+        [Tooltip("Fine-tune where the shaft crosses the left hand, in the left-hand bone's local space (e.g. push a little further into the palm).")]
+        [SerializeField] private Vector3 leftGripLocalOffset = Vector3.zero;
+
+        private Transform _leftHand;   // wrist bone — fallback target and local frame for the offset
+        private Transform _leftGrip;   // the point the shaft is aimed through (palm proxy when aimAtPalm)
         private Vector3 _baseLocalPos;      // the prop's authored seat under the hand
         private Quaternion _baseLocalRot;   // restored each frame so our correction never compounds / leaves residual skew
         private bool _haveBase;
@@ -51,12 +58,24 @@ namespace Hordebreakers
         private void Awake()
         {
             if (animator == null) animator = GetComponentInChildren<Animator>();
-            if (animator != null && animator.isHuman) _leftHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
+            if (animator != null && animator.isHuman)
+            {
+                _leftHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
+                Transform palm = aimAtPalm ? animator.GetBoneTransform(HumanBodyBones.LeftMiddleProximal) : null;
+                _leftGrip = palm != null ? palm : _leftHand;   // palm proxy → the shaft sits in the hand, not on the wrist
+            }
+        }
+
+        private Vector3 LeftGripWorld()
+        {
+            Vector3 p = _leftGrip.position;
+            if (_leftHand != null && leftGripLocalOffset != Vector3.zero) p += _leftHand.TransformVector(leftGripLocalOffset);
+            return p;
         }
 
         private void LateUpdate()
         {
-            if (weapon == null || _leftHand == null) return;
+            if (weapon == null || _leftGrip == null) return;
 
             // The humanoid Animator never re-drives this generic child prop, so a world-space write here bakes into the
             // prop's localRotation and would compound frame-over-frame — leaving the spear cocked at the last grip angle
@@ -69,7 +88,7 @@ namespace Hordebreakers
             bool eligible = !attackStatesOnly || InAttackState();
             Vector3 gripWorld = weapon.TransformPoint(gripLocalPoint);
             Vector3 shaftDir = weapon.TransformDirection(shaftLocalAxis).normalized;
-            Vector3 toPalm = _leftHand.position - gripWorld;
+            Vector3 toPalm = LeftGripWorld() - gripWorld;
             float along = Vector3.Dot(toPalm, shaftDir);
             float lineDist = (toPalm - shaftDir * along).magnitude;
 
