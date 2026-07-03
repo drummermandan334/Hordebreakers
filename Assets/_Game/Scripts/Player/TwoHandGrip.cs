@@ -47,6 +47,12 @@ namespace Hordebreakers
         [Tooltip("Fine-tune where the shaft crosses the left hand, in the left-hand bone's local space (e.g. push a little further into the palm).")]
         [SerializeField] private Vector3 leftGripLocalOffset = Vector3.zero;
 
+        [Header("Per-state grip slide")]
+        [Tooltip("Animator state that slides the grip toward the BUTT (spear moves forward along its shaft so the head reaches out) — e.g. the L3 slam. Empty = never.")]
+        [SerializeField] private string gripSlideState = "L3";
+        [Tooltip("Metres to slide the grip toward the butt during gripSlideState. 0 = off. Eased in/out at blendSpeed.")]
+        [SerializeField] private float gripSlideBack = 0.2f;
+
         private Transform _leftHand;   // wrist bone — fallback target and local frame for the offset
         private Transform _leftGrip;   // the point the shaft is aimed through (palm proxy when aimAtPalm)
         private Vector3 _baseLocalPos;      // the prop's authored seat under the hand
@@ -54,6 +60,8 @@ namespace Hordebreakers
         private bool _haveBase;
         private float _weight;
         private bool _gripping;
+        private Vector3 _aimWant;           // world aim dir; frozen on release so we ease straight back, not chase the hand
+        private float _slide;               // eased per-state grip slide amount
 
         private void Awake()
         {
@@ -86,8 +94,17 @@ namespace Hordebreakers
             weapon.localRotation = _baseLocalRot;
 
             bool eligible = !attackStatesOnly || InAttackState();
-            Vector3 gripWorld = weapon.TransformPoint(gripLocalPoint);
             Vector3 shaftDir = weapon.TransformDirection(shaftLocalAxis).normalized;
+            Vector3 gripWorld = weapon.TransformPoint(gripLocalPoint);   // the real right-hand grip, at the authored seat (pre-slide)
+
+            // Per-state grip slide: during gripSlideState (the L3 slam) slide the spear FORWARD along its shaft so the
+            // right hand grips further toward the butt and more of the head reaches out. Eased so it never pops, and
+            // re-derived from the restored seat each frame so it can't accumulate. gripWorld above stays the real hand,
+            // so the two-hand rotation below still pivots about the right hand, not the slid prop origin.
+            float slideTarget = (gripSlideBack != 0f && InState(gripSlideState)) ? gripSlideBack : 0f;
+            _slide = Mathf.Lerp(_slide, slideTarget, 1f - Mathf.Exp(-blendSpeed * Time.deltaTime));
+            if (Mathf.Abs(_slide) > 0.0005f) weapon.position += shaftDir * _slide;
+
             Vector3 toPalm = LeftGripWorld() - gripWorld;
             float along = Vector3.Dot(toPalm, shaftDir);
             float lineDist = (toPalm - shaftDir * along).magnitude;
@@ -98,9 +115,13 @@ namespace Hordebreakers
             _weight = Mathf.Lerp(_weight, wantGrip ? 1f : 0f, 1f - Mathf.Exp(-blendSpeed * Time.deltaTime));
             if (_weight < 0.001f) return;
 
-            // Rotate the weapon about the grip point so the shaft passes through the left palm (roll preserved).
-            Vector3 want = toPalm.normalized;
-            Quaternion delta = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(shaftDir, want), _weight);
+            // Aim the shaft through the left palm, rotating about the right-hand grip (roll preserved). Track the live
+            // palm ONLY while actively gripping; on release hold the last aim so the spear eases straight back to the
+            // one-handed pose instead of chasing the hand as it pulls away — that chase read as the spear "turning" to
+            // the side after the slam.
+            if (wantGrip && toPalm.sqrMagnitude > 1e-6f) _aimWant = toPalm.normalized;
+            Vector3 aim = _aimWant == Vector3.zero ? shaftDir : _aimWant;
+            Quaternion delta = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(shaftDir, aim), _weight);
             weapon.rotation = delta * weapon.rotation;
             weapon.position = gripWorld + delta * (weapon.position - gripWorld);
         }
@@ -110,6 +131,13 @@ namespace Hordebreakers
             if (animator == null) return false;
             if (animator.GetCurrentAnimatorStateInfo(0).IsTag("Attack")) return true;
             return animator.IsInTransition(0) && animator.GetNextAnimatorStateInfo(0).IsTag("Attack");
+        }
+
+        private bool InState(string stateName)
+        {
+            if (animator == null || string.IsNullOrEmpty(stateName)) return false;
+            if (animator.GetCurrentAnimatorStateInfo(0).IsName(stateName)) return true;
+            return animator.IsInTransition(0) && animator.GetNextAnimatorStateInfo(0).IsName(stateName);
         }
     }
 }
