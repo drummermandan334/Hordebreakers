@@ -48,8 +48,70 @@ MonoBehaviour:
   comboChainOpen: 0.75
   minSwingInterval: 0.25
   attackSteerSpeed: 1.5
-  dodgeCancelPhase: 0.55
+  dodgeCancelPhase: 0.45
   attackSpeedMult: 1
+  lightSlots:
+  - contactPhase: 0.28
+    damageMult: 1
+    reachMult: 1
+    stepSpeed: 3.2
+    stepTime: 0.12
+    hitShape: 1
+    chainOpen: 0.4
+  - contactPhase: 0.26
+    damageMult: 1
+    reachMult: 1
+    stepSpeed: 3.2
+    stepTime: 0.12
+    hitShape: 1
+    chainOpen: 0.37
+  - contactPhase: 0.35
+    damageMult: 1
+    reachMult: 1.15
+    stepSpeed: 5
+    stepTime: 0.15
+    hitShape: 1
+    chainOpen: 0.6
+  heavySlots:
+  - contactPhase: 0.3
+    damageMult: 1
+    reachMult: 1
+    stepSpeed: 1.8
+    stepTime: 0.12
+    hitShape: 0
+    chainOpen: 0.4
+  - contactPhase: 0.3
+    damageMult: 1
+    reachMult: 1
+    stepSpeed: 1.8
+    stepTime: 0.12
+    hitShape: 0
+    chainOpen: 0.4
+  - contactPhase: 0.35
+    damageMult: 1
+    reachMult: 1
+    stepSpeed: 4.5
+    stepTime: 0.15
+    hitShape: 1
+    chainOpen: 0.65
+  jumpLightSlot:
+    contactPhase: 0.35
+    damageMult: 1
+    reachMult: 1
+    stepSpeed: 2.5
+    stepTime: 0.12
+    hitShape: 1
+    chainOpen: 0.75
+  jumpHeavySlot:
+    contactPhase: 0.4
+    damageMult: 1
+    reachMult: 1
+    stepSpeed: 2.5
+    stepTime: 0.12
+    hitShape: 0
+    chainOpen: 0.75
+  thrustRadius: 0.5
+  thrustArcDot: 0.55
   hitStopDamageScaleMax: 4
   killHitStop: {x: 0.05, y: 0.15}
   finisherKillHitStop: {x: 0.09, y: 0.08}
