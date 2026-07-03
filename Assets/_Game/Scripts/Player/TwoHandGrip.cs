@@ -8,10 +8,24 @@ namespace Hordebreakers
     /// which humanoid retargeting silently drops. The hands still do the two-handed motion (that retargets fine),
     /// but the weapon stays glued to the one-handed right-hand socket and skews.
     ///
-    /// This reproduces the intent from the retargeted hand positions instead: whenever the LEFT palm animates close
-    /// to the weapon's shaft line, rotate the weapon about its right-hand grip point so the shaft passes through the
-    /// left palm; ease off when the hand leaves. One-handed segments are untouched (left palm far → weight 0), so it
-    /// is safe to leave enabled for the whole kit — every current and future two-handed clip just works.
+    /// This reproduces the intent from the retargeted hand positions: whenever the LEFT palm animates onto the
+    /// weapon's shaft line, rotate the weapon about its right-hand grip point so the shaft passes through the palm;
+    /// ease off when the hand leaves. One-handed segments are untouched, so it's safe to leave enabled for the kit.
+    ///
+    /// Correctness notes (the v1 "snaps 30–45° after the slam" glitch):
+    /// - REBASE EVERY FRAME: during attacks nothing re-poses the prop bone (the grip override layers are suppressed),
+    ///   so corrections applied to the live transform ACCUMULATE and then stick after release. We cache the prop's
+    ///   authored rest local pose and restore it before applying a fresh, absolute correction each frame — zero
+    ///   accumulation, and releasing eases cleanly back to the authored pose.
+    /// - NO CHASING: the alignment target is only updated while genuinely gripping; on release the last target is
+    ///   frozen and faded out, so the spear never tracks the hand as it LEAVES the shaft.
+    /// - DWELL-GATED: the palm must STAY on the shaft for engageDelay before the grip engages — a real grab dwells,
+    ///   a hand merely passing near the spear crosses it in 2–3 frames and never engages. (Do NOT gate by correction
+    ///   angle: the correction needed during a genuine two-hand segment is large by definition.)
+    /// - AIM AT THE PALM: the target is the left PALM (LeftMiddleProximal), not the wrist bone (LeftHand) — the wrist
+    ///   sits ~10cm behind where the fingers wrap, so aiming there rides the spear on the forearm instead of the hand.
+    /// - PER-STATE GRIP SLIDE: named states (the L3 slam) slide the grip toward the butt so more of the head reaches
+    ///   out. Eased and rebased with the alignment, so it can't accumulate.
     /// Runs in LateUpdate after the Animator pose and before WeaponVfx (order 60) reads the blade transform.
     /// </summary>
     [DefaultExecutionOrder(55)]
@@ -33,9 +47,13 @@ namespace Hordebreakers
         [Tooltip("Left palm within this distance of the shaft LINE → the clip is doing a two-handed grab: align.")]
         [SerializeField] private float engageDistance = 0.35f;
         [Tooltip("Once gripping, keep aligning until the palm is beyond this (hysteresis — no flicker at the edge).")]
-        [SerializeField] private float releaseDistance = 0.5f;
+        [SerializeField] private float releaseDistance = 0.45f;
         [Tooltip("Ignore a palm closer to the grip than this along the shaft (degenerate direction / crossing hands).")]
         [SerializeField] private float minHandSeparation = 0.15f;
+        [Tooltip("Ignore a palm farther than this along the shaft — beyond the realistic grip range of the haft.")]
+        [SerializeField] private float maxHandAlong = 1.1f;
+        [Tooltip("The palm must stay on the shaft this long (s) before the grip engages — a real grab dwells, a passing hand crosses in 2–3 frames. (Replaces the v2 angle clamp, which wrongly rejected genuine grabs: the needed correction during a two-hand segment is LARGE by definition.)")]
+        [SerializeField] private float engageDelay = 0.06f;
         [Tooltip("How fast the alignment eases in/out (exponential).")]
         [SerializeField] private float blendSpeed = 14f;
         [Tooltip("Only align during Attack-tagged states — locomotion/idle sometimes swings the off hand near the shaft.")]
@@ -53,15 +71,17 @@ namespace Hordebreakers
         [Tooltip("Metres to slide the grip toward the butt during gripSlideState. 0 = off. Eased in/out at blendSpeed.")]
         [SerializeField] private float gripSlideBack = 0.2f;
 
-        private Transform _leftHand;   // wrist bone — fallback target and local frame for the offset
-        private Transform _leftGrip;   // the point the shaft is aimed through (palm proxy when aimAtPalm)
-        private Vector3 _baseLocalPos;      // the prop's authored seat under the hand
-        private Quaternion _baseLocalRot;   // restored each frame so our correction never compounds / leaves residual skew
-        private bool _haveBase;
+        private Transform _leftHand;                           // wrist bone — fallback target and local frame for the offset
+        private Transform _leftGrip;                           // the point the shaft is aimed through (palm proxy when aimAtPalm)
         private float _weight;
         private bool _gripping;
-        private Vector3 _aimWant;           // world aim dir; frozen on release so we ease straight back, not chase the hand
-        private float _slide;               // eased per-state grip slide amount
+        private float _dwellTimer;                             // time the palm has been continuously on the shaft (pre-engage)
+        private Quaternion _heldDelta = Quaternion.identity;   // frozen on release so we never chase a departing hand
+        private float _slide;                                  // eased per-state grip slide amount
+        private Vector3 _restLocalPos;
+        private Quaternion _restLocalRot;
+        private bool _restCached;
+        private bool _applied;   // we moved the weapon last frame → restore the rest pose before computing anew
 
         private void Awake()
         {
@@ -85,45 +105,42 @@ namespace Hordebreakers
         {
             if (weapon == null || _leftGrip == null) return;
 
-            // The humanoid Animator never re-drives this generic child prop, so a world-space write here bakes into the
-            // prop's localRotation and would compound frame-over-frame — leaving the spear cocked at the last grip angle
-            // once a two-handed segment eases out. Snapshot the authored local seat once, then restore it every frame so
-            // the prop rigidly follows the hand and each frame's alignment starts clean (one-handed pose stays authored).
-            if (!_haveBase) { _baseLocalPos = weapon.localPosition; _baseLocalRot = weapon.localRotation; _haveBase = true; }
-            weapon.localPosition = _baseLocalPos;
-            weapon.localRotation = _baseLocalRot;
+            // Cache the authored rest pose once, and REBASE to it whenever we touched the weapon last frame —
+            // nothing else re-poses the prop bone mid-attack, so without this our corrections accumulate and stick.
+            if (!_restCached) { _restLocalPos = weapon.localPosition; _restLocalRot = weapon.localRotation; _restCached = true; }
+            if (_applied) { weapon.localPosition = _restLocalPos; weapon.localRotation = _restLocalRot; _applied = false; }
 
             bool eligible = !attackStatesOnly || InAttackState();
+            Vector3 gripWorld = weapon.TransformPoint(gripLocalPoint);   // real right-hand grip, at the authored rest pose (pre-slide)
             Vector3 shaftDir = weapon.TransformDirection(shaftLocalAxis).normalized;
-            Vector3 gripWorld = weapon.TransformPoint(gripLocalPoint);   // the real right-hand grip, at the authored seat (pre-slide)
 
             // Per-state grip slide: during gripSlideState (the L3 slam) slide the spear FORWARD along its shaft so the
-            // right hand grips further toward the butt and more of the head reaches out. Eased so it never pops, and
-            // re-derived from the restored seat each frame so it can't accumulate. gripWorld above stays the real hand,
-            // so the two-hand rotation below still pivots about the right hand, not the slid prop origin.
+            // right hand grips further toward the butt and more of the head reaches out. Rebased each frame via _applied
+            // so it can't accumulate; gripWorld above stays the real hand, so the rotation below still pivots there.
             float slideTarget = (gripSlideBack != 0f && InState(gripSlideState)) ? gripSlideBack : 0f;
             _slide = Mathf.Lerp(_slide, slideTarget, 1f - Mathf.Exp(-blendSpeed * Time.deltaTime));
-            if (Mathf.Abs(_slide) > 0.0005f) weapon.position += shaftDir * _slide;
+            if (Mathf.Abs(_slide) > 0.0005f) { weapon.position += shaftDir * _slide; _applied = true; }
 
             Vector3 toPalm = LeftGripWorld() - gripWorld;
             float along = Vector3.Dot(toPalm, shaftDir);
             float lineDist = (toPalm - shaftDir * along).magnitude;
 
-            // Two-handed when the palm is near the shaft line, ahead of the grip by a real hand-width (hysteresis on exit).
-            bool wantGrip = eligible && along > minHandSeparation && lineDist < (_gripping ? releaseDistance : engageDistance);
+            // A grip = palm on the haft segment, near the shaft line (hysteresis on exit), that DWELLS there —
+            // a real grab stays on the shaft; a hand passing by crosses it in 2–3 frames and never engages.
+            bool nearShaft = eligible && along > minHandSeparation && along < maxHandAlong
+                             && lineDist < (_gripping ? releaseDistance : engageDistance);
+            _dwellTimer = nearShaft ? _dwellTimer + Time.deltaTime : 0f;
+            bool wantGrip = nearShaft && (_gripping || _dwellTimer >= engageDelay);
             _gripping = wantGrip;
-            _weight = Mathf.Lerp(_weight, wantGrip ? 1f : 0f, 1f - Mathf.Exp(-blendSpeed * Time.deltaTime));
-            if (_weight < 0.001f) return;
+            if (wantGrip) _heldDelta = Quaternion.FromToRotation(shaftDir, toPalm.normalized);   // track the palm ONLY while gripping; frozen through the release fade
 
-            // Aim the shaft through the left palm, rotating about the right-hand grip (roll preserved). Track the live
-            // palm ONLY while actively gripping; on release hold the last aim so the spear eases straight back to the
-            // one-handed pose instead of chasing the hand as it pulls away — that chase read as the spear "turning" to
-            // the side after the slam.
-            if (wantGrip && toPalm.sqrMagnitude > 1e-6f) _aimWant = toPalm.normalized;
-            Vector3 aim = _aimWant == Vector3.zero ? shaftDir : _aimWant;
-            Quaternion delta = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(shaftDir, aim), _weight);
+            _weight = Mathf.Lerp(_weight, wantGrip ? 1f : 0f, 1f - Mathf.Exp(-blendSpeed * Time.deltaTime));
+            if (_weight < 0.002f) { _weight = 0f; _heldDelta = Quaternion.identity; return; }   // released — rest pose restored next frame via _applied if the slide moved it
+
+            Quaternion delta = Quaternion.Slerp(Quaternion.identity, _heldDelta, _weight);
             weapon.rotation = delta * weapon.rotation;
-            weapon.position = gripWorld + delta * (weapon.position - gripWorld);
+            weapon.position = gripWorld + delta * (weapon.position - gripWorld);   // weapon.position already includes the slide
+            _applied = true;
         }
 
         private bool InAttackState()
