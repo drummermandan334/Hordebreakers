@@ -122,6 +122,7 @@ namespace Hordebreakers
         private Vector3 _attackVel;        // brief forward drive on a swing
         private float _attackStepTimer;    // > 0 while the forward step is applied
         private float _pendingReach, _pendingDamage;   // the armed swing's hit, resolved at its contact phase
+        private AttackSlotTuning _pendingSlot;         // the armed swing's per-slot tuning (contact phase, hit shape, chain window)
         private bool _pendingHeavy, _pendingFinisher;
         private bool _swingHitResolved;    // true once the current swing has landed its hit (one hit per swing)
         private float _nextSwingTime;      // earliest time the next swing can fire — a hard rate limit that holds across the inAttack=false gaps (after a combo / out of a dodge) where animator-state gating fails
@@ -245,7 +246,7 @@ namespace Hordebreakers
             _blocking = false; _guardBreakTimer = 0f;
             _attackStepTimer = 0f; _attackVel = Vector3.zero;
             _bufferedAttack = 0; _bufferedDodge = false; _comboStep = 0;
-            _castSwing = false; _swingHitResolved = false; _nextSwingTime = 0f;
+            _castSwing = false; _swingHitResolved = false; _nextSwingTime = 0f; _pendingSlot = null;
             _hitReactCdTimer = 0f; _lastAttackStateHash = 0;
             PostFxDirector.MusouGrade(false); PostFxDirector.SetHealthFraction(1f);   // clear any lingering ult grade / low-HP framing on respawn
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
@@ -308,11 +309,13 @@ namespace Hordebreakers
             Vector3 moveDir = locked ? LockedMoveDir(lockDir) : ReadMoveDir();
 
             bool inAttack = InComboAttack();                                       // base layer is playing an attack clip
-            // Chain only once the swing has played comboChainOpen of its clip (earlier presses buffer), AND no sooner
-            // than minSwingInterval since the last swing. The time floor is the real guard against mashing: in the gaps
-            // between swings / after a combo / out of a dodge the swing has ended, so inAttack is false and the phase
-            // gate opens every frame — only the time limit stops a per-frame burst of swings + whooshes there.
-            bool canAct = (!inAttack || (_grounded && AttackPhase() >= data.comboChainOpen)) && Time.time >= _nextSwingTime;
+            // Chain only once the swing has played its chain-open fraction (per-slot when armed — each clip has its own
+            // rhythm; comboChainOpen is the fallback), AND no sooner than minSwingInterval since the last swing. The time
+            // floor is the real guard against mashing: in the gaps between swings / after a combo / out of a dodge the
+            // swing has ended, so inAttack is false and the phase gate opens every frame — only the time limit stops a
+            // per-frame burst of swings + whooshes there.
+            float chainOpen = _pendingSlot != null ? _pendingSlot.chainOpen : data.comboChainOpen;
+            bool canAct = (!inAttack || (_grounded && AttackPhase() >= chainOpen)) && Time.time >= _nextSwingTime;
 
             // A buffered dodge (pressed mid-swing, before the cancel window) fires the instant recovery opens — a
             // swing is committed through startup/active and only dodge-cancelable once it reaches dodgeCancelPhase.
@@ -359,9 +362,12 @@ namespace Hordebreakers
 
             if (inAttack)
             {
-                // Land the swing's hit once it reaches its contact phase (after the lunge has carried us in).
-                // Heavies land later so the impact stays synced with the heavier swing's slash VFX.
-                float contactPhase = _castSwing ? castContactPhase : (_pendingHeavy ? heavyMeleeContactPhase : meleeContactPhase);
+                // Land the swing's hit once it reaches its contact phase (after the lunge has carried us in) — PER-SLOT
+                // when armed (each clip lands at its own visual apex; the old globals are the fallback). KEEP the slot's
+                // phase in sync with WeaponVfx's matching strike fraction so the hit and the swipe VFX land together.
+                float contactPhase = _castSwing ? castContactPhase
+                    : _pendingSlot != null ? _pendingSlot.contactPhase
+                    : (_pendingHeavy ? heavyMeleeContactPhase : meleeContactPhase);
                 if (!_swingHitResolved && AttackPhase() >= contactPhase)
                 {
                     if (_castSwing) ResolveCast(); else ResolveSwingHit();
@@ -789,10 +795,10 @@ namespace Hordebreakers
             return cur.IsTag("Attack") ? cur.fullPathHash : 0;
         }
 
-        private void StepForward(float speed)
+        private void StepForward(float speed, float time)
         {
             _attackVel = modelRoot.forward * speed;
-            _attackStepTimer = attackStepTime;
+            _attackStepTimer = time > 0f ? time : attackStepTime;
         }
 
         // ---------- Dodge ----------
@@ -829,14 +835,19 @@ namespace Hordebreakers
 
             bool finisher = _comboStep >= 3;
             if (_voice != null) _voice.Attack(heavy, finisher);   // chance-gated effort grunt (not every swing)
-            StepForward(finisher ? lungeStep : attackStep);
 
-            // Stage this swing's hit params; the hit is ARMED + resolved in Update off the animator state change
-            // (CurrentAttackStateHash), so it lands at this swing's real contact phase — never on the press frame.
+            // Stage this swing's hit params from its PER-SLOT tuning (each combo slot = a different clip, so each gets
+            // its own contact phase / forward drive / hit shape / chain window). Airborne presses route to the jump-attack
+            // slots (the animator plays JumpAttack/JumpAttackHeavy there). Damage/reach are multipliers over the
+            // light/heavy base stats so augment dials keep working. The hit is ARMED + resolved in Update off the
+            // animator state change (CurrentAttackStateHash) — it lands at the clip's real contact phase, never on press.
+            AttackSlotTuning slot = data.GetAttackSlot(_comboStep, heavy, !_grounded);
+            _pendingSlot = slot;
+            StepForward(slot.stepSpeed, slot.stepTime);
             _pendingHeavy = heavy;
             _pendingFinisher = finisher;
-            _pendingReach = heavy ? data.heavyReach : data.lightReach;
-            _pendingDamage = heavy ? data.heavyDamage : data.lightDamage;
+            _pendingReach = (heavy ? data.heavyReach : data.lightReach) * slot.reachMult;
+            _pendingDamage = (heavy ? data.heavyDamage : data.lightDamage) * slot.damageMult;
         }
 
         /// <summary>Applies the armed swing's melee hit once, at its contact phase.</summary>
@@ -896,14 +907,30 @@ namespace Hordebreakers
             killed = false;
             Vector3 origin = transform.position + Vector3.up;
             Vector3 fwd = modelRoot.forward;
-            Vector3 c = origin + fwd * (reach * meleeHitboxCenterFactor);
-            int n = Physics.OverlapSphereNonAlloc(c, reach * meleeHitboxRadiusFactor, _hits, enemyMask);
+
+            // Hit volume by the slot's shape: SWEEP = the classic sphere (arcs/cuts — wide, catches the crowd);
+            // THRUST = a narrow forward capsule from the chest out to reach (spear stabs — long, skewers in a LINE and
+            // whiffs enemies beside you). Same non-alloc buffer either way; the arc gate tightens for thrusts.
+            bool thrust = _pendingSlot != null && _pendingSlot.hitShape == AttackHitShape.Thrust;
+            int n;
+            float arcDot;
+            if (thrust)
+            {
+                n = Physics.OverlapCapsuleNonAlloc(origin, origin + fwd * reach, data.thrustRadius, _hits, enemyMask);
+                arcDot = data.thrustArcDot;
+            }
+            else
+            {
+                Vector3 c = origin + fwd * (reach * meleeHitboxCenterFactor);
+                n = Physics.OverlapSphereNonAlloc(c, reach * meleeHitboxRadiusFactor, _hits, enemyMask);
+                arcDot = meleeArcDot;
+            }
             int hits = 0;
             for (int i = 0; i < n; i++)
             {
                 Collider col = _hits[i];
                 Vector3 to = col.transform.position - origin; to.y = 0f;
-                if (to.sqrMagnitude > 0.0001f && Vector3.Dot(to.normalized, fwd) < meleeArcDot) continue;  // front arc only
+                if (to.sqrMagnitude > 0.0001f && Vector3.Dot(to.normalized, fwd) < arcDot) continue;  // front arc only (tighter for thrusts)
                 if (col.TryGetComponent(out IDamageable d) && d.IsAlive)
                 {
                     d.TakeDamage(damage, origin);

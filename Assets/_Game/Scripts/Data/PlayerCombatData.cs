@@ -2,6 +2,36 @@ using UnityEngine;
 
 namespace Hordebreakers
 {
+    /// <summary>How an attack's hit volume is shaped. Sweep = the classic sphere + front arc (sword arcs, wide cuts).
+    /// Thrust = a narrow forward capsule (spear stabs) — long reach that skewers in a LINE and whiffs beside you.</summary>
+    public enum AttackHitShape { Sweep, Thrust }
+
+    /// <summary>
+    /// Per-attack-slot tuning (L1/L2/L3, H1/H2/H3, and the jump attacks). Each combo slot maps to a different clip, so
+    /// each gets its own contact timing, forward drive, hit shape and chain window — two global phases can't express a
+    /// six-clip kit. Damage/reach are MULTIPLIERS over the light/heavy base stats so the augment dials keep working.
+    /// </summary>
+    [System.Serializable]
+    public class AttackSlotTuning
+    {
+        [Range(0f, 1f)]
+        [Tooltip("Fraction of THIS slot's clip at which the hit lands (thrusts peak early ~0.30–0.40; big sweeps ~0.45–0.55). Keep in sync with the matching WeaponVfx strike fraction.")]
+        public float contactPhase = 0.35f;
+        [Tooltip("Damage = (lightDamage|heavyDamage) x this — a multiplier so augment damage dials still apply.")]
+        public float damageMult = 1f;
+        [Tooltip("Reach = (lightReach|heavyReach) x this.")]
+        public float reachMult = 1f;
+        [Tooltip("Forward drive (m/s) while this swing's step lasts — thrusts step in harder than close sweeps.")]
+        public float stepSpeed = 2.5f;
+        [Tooltip("How long the forward step lasts, then hard stop.")]
+        public float stepTime = 0.12f;
+        [Tooltip("Sweep = sphere + front arc (arcs/cuts). Thrust = narrow forward capsule (stabs) — skewers in a line.")]
+        public AttackHitShape hitShape = AttackHitShape.Sweep;
+        [Range(0f, 1f)]
+        [Tooltip("Fraction of THIS clip that plays before the next attack can chain (earlier presses buffer). Per-clip so the combo rhythm matches each clip's real length.")]
+        public float chainOpen = 0.75f;
+    }
+
     /// <summary>Data-driven player combat tuning. Mirror the values in HORDEBREAKERS_Tuning.xlsx.</summary>
     [CreateAssetMenu(fileName = "PlayerCombatData", menuName = "Hordebreakers/Player Combat Data")]
     public class PlayerCombatData : ScriptableObject
@@ -87,6 +117,43 @@ namespace Hordebreakers
         public float dodgeCancelPhase = 0.55f;
         [Tooltip("Playback-speed multiplier for attack swings, driven onto the Animator's 'AttackSpeed' float param. 1 = authored speed; Augments raise it. minSwingInterval (wall-clock) still floors the effective rate.")]
         public float attackSpeedMult = 1f;
+
+        [Header("Per-attack slots (index 0..2 = combo hits 1..3) — each clip gets its own timing/drive/hit shape")]
+        [Tooltip("Light combo slots L1/L2/L3. Defaults reproduce the old globals (contact 0.35, step 2.5, finisher lunge 4).")]
+        public AttackSlotTuning[] lightSlots =
+        {
+            new AttackSlotTuning { contactPhase = 0.35f, stepSpeed = 2.5f },
+            new AttackSlotTuning { contactPhase = 0.35f, stepSpeed = 2.5f },
+            new AttackSlotTuning { contactPhase = 0.35f, stepSpeed = 4.0f },   // 3rd hit = the lunge
+        };
+        [Tooltip("Heavy combo slots H1/H2/H3. Defaults reproduce the old globals (contact 0.5, step 2.5, finisher lunge 4).")]
+        public AttackSlotTuning[] heavySlots =
+        {
+            new AttackSlotTuning { contactPhase = 0.5f, stepSpeed = 2.5f },
+            new AttackSlotTuning { contactPhase = 0.5f, stepSpeed = 2.5f },
+            new AttackSlotTuning { contactPhase = 0.5f, stepSpeed = 4.0f },
+        };
+        [Tooltip("Airborne light attack (the JumpAttack state).")]
+        public AttackSlotTuning jumpLightSlot = new AttackSlotTuning { contactPhase = 0.35f, stepSpeed = 2.5f };
+        [Tooltip("Airborne heavy attack (the JumpAttackHeavy state).")]
+        public AttackSlotTuning jumpHeavySlot = new AttackSlotTuning { contactPhase = 0.5f, stepSpeed = 2.5f };
+
+        [Header("Thrust hitbox (hitShape = Thrust: a narrow forward capsule from the chest to reach)")]
+        [Tooltip("Capsule radius (m) of a thrust — the spear's effective shaft width. Narrow, so stabs whiff enemies beside you.")]
+        public float thrustRadius = 0.5f;
+        [Tooltip("Front-arc gate for thrust hits (tighter than the sweep's meleeArcDot) — keeps the stab reading as a LINE.")]
+        [Range(-1f, 1f)] public float thrustArcDot = 0.55f;
+
+        /// <summary>The tuning slot for a swing: combo step 1..3 picks the light/heavy slot; airborne uses the jump slots.
+        /// Never returns null — falls back to a default-constructed slot if an array is left short in the inspector.</summary>
+        public AttackSlotTuning GetAttackSlot(int comboStep, bool heavy, bool airborne)
+        {
+            if (airborne) return heavy ? jumpHeavySlot : jumpLightSlot;
+            AttackSlotTuning[] set = heavy ? heavySlots : lightSlots;
+            int i = Mathf.Clamp(comboStep - 1, 0, 2);
+            if (set != null && i < set.Length && set[i] != null) return set[i];
+            return heavy ? new AttackSlotTuning { contactPhase = 0.5f } : new AttackSlotTuning();
+        }
 
         [Header("Impact scaling (heavier hits read heavier)")]
         [Tooltip("Damage / lightDamage is clamped to this ceiling when scaling hit-stop & shake, so a huge heavy doesn't lock the screen.")]

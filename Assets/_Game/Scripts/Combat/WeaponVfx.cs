@@ -20,10 +20,10 @@ namespace Hordebreakers
         [SerializeField] private Transform bladeSocket;
 
         [Header("Effects")]
-        [SerializeField] private GameObject slashVfx;     // every swing except the stab state
-        [SerializeField] private GameObject stabVfx;      // the stab attack only
-        [Tooltip("Animator state that uses the stab instead of the slash (e.g. the light combo's 3rd hit).")]
-        [SerializeField] private string stabState = "L3";
+        [SerializeField] private GameObject slashVfx;     // every swing except the stab states
+        [SerializeField] private GameObject stabVfx;      // the stab attacks only
+        [Tooltip("Animator states that use the stab instead of the slash. A sword kit stabs on one hit (L3); a SPEAR kit stabs on most (e.g. L1, L2, L3, H3).")]
+        [SerializeField] private string[] stabStates = { "L3" };
 
         [Header("Slash placement (local to the blade)")]
         [FormerlySerializedAs("localPosition")]
@@ -49,8 +49,18 @@ namespace Hordebreakers
         [Tooltip("Seconds before the spawned VFX is destroyed (give the slowed slash room to finish).")]
         [SerializeField] private float lifetime = 0.8f;
 
-        [Header("Timing (fraction of the attack clip when it strikes)")]
+        [Header("Timing (fraction of the attack clip when it strikes) — KEEP each slot in sync with PlayerCombatData's matching AttackSlotTuning.contactPhase so the hit and VFX land together")]
+        [Tooltip("Per-slot strike fraction for L1/L2/L3 (index 0..2). Empty/short array falls back to lightStrikeFraction.")]
+        [SerializeField] private float[] lightStrikeFractions = { 0.35f, 0.35f, 0.35f };
+        [Tooltip("Per-slot strike fraction for H1/H2/H3 (index 0..2). Empty/short array falls back to heavyStrikeFraction.")]
+        [SerializeField] private float[] heavyStrikeFractions = { 0.5f, 0.5f, 0.5f };
+        [Tooltip("Strike fraction for the airborne JumpAttack state.")]
+        [Range(0f, 1f)][SerializeField] private float jumpLightStrikeFraction = 0.35f;
+        [Tooltip("Strike fraction for the airborne JumpAttackHeavy state.")]
+        [Range(0f, 1f)][SerializeField] private float jumpHeavyStrikeFraction = 0.5f;
+        [Tooltip("Fallback when the light array is empty/short (the old global).")]
         [Range(0f, 1f)][SerializeField] private float lightStrikeFraction = 0.35f;
+        [Tooltip("Fallback when the heavy array is empty/short (the old global).")]
         [Range(0f, 1f)][SerializeField] private float heavyStrikeFraction = 0.5f;
 
         private int _lastStateHash;
@@ -70,13 +80,37 @@ namespace Hordebreakers
             if (st.fullPathHash != _lastStateHash) { _lastStateHash = st.fullPathHash; _firedThisSwing = false; }   // new swing started
             if (_firedThisSwing) return;
 
-            bool heavy = st.IsName("H1") || st.IsName("H2") || st.IsName("H3") || st.IsName("JumpAttackHeavy");
-            float frac = heavy ? heavyStrikeFraction : lightStrikeFraction;
-            if (Mathf.Repeat(st.normalizedTime, 1f) < frac) return;
+            if (Mathf.Repeat(st.normalizedTime, 1f) < StrikeFraction(st)) return;
 
-            bool isStab = st.IsName(stabState);
+            bool isStab = IsStabState(st);
             Spawn(isStab ? stabVfx : slashVfx, isStab);
             _firedThisSwing = true;
+        }
+
+        /// <summary>Per-state strike fraction (mirrors PlayerCombatData's per-slot contact phases). Unknown Attack-tagged
+        /// states fall back to the legacy light/heavy globals so a new state never silently loses its VFX.</summary>
+        private float StrikeFraction(AnimatorStateInfo st)
+        {
+            if (st.IsName("L1")) return SlotFrac(lightStrikeFractions, 0, lightStrikeFraction);
+            if (st.IsName("L2")) return SlotFrac(lightStrikeFractions, 1, lightStrikeFraction);
+            if (st.IsName("L3")) return SlotFrac(lightStrikeFractions, 2, lightStrikeFraction);
+            if (st.IsName("H1")) return SlotFrac(heavyStrikeFractions, 0, heavyStrikeFraction);
+            if (st.IsName("H2")) return SlotFrac(heavyStrikeFractions, 1, heavyStrikeFraction);
+            if (st.IsName("H3")) return SlotFrac(heavyStrikeFractions, 2, heavyStrikeFraction);
+            if (st.IsName("JumpAttack")) return jumpLightStrikeFraction;
+            if (st.IsName("JumpAttackHeavy")) return jumpHeavyStrikeFraction;
+            return lightStrikeFraction;
+        }
+
+        private static float SlotFrac(float[] set, int i, float fallback)
+            => set != null && i < set.Length ? set[i] : fallback;
+
+        private bool IsStabState(AnimatorStateInfo st)
+        {
+            if (stabStates == null) return false;
+            for (int i = 0; i < stabStates.Length; i++)
+                if (!string.IsNullOrEmpty(stabStates[i]) && st.IsName(stabStates[i])) return true;
+            return false;
         }
 
         private void Spawn(GameObject prefab, bool isStab)
