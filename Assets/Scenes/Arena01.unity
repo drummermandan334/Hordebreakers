@@ -1126,6 +1126,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7200540873863231687, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2038274774}
+    - targetCorrespondingSourceObject: {fileID: 7200540873863231687, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2038274778}
     - targetCorrespondingSourceObject: {fileID: 8671790465278343527, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1207653562}
@@ -9122,6 +9125,27 @@ MonoBehaviour:
   _spatialBlend: 0
   _output: {fileID: 0}
   _minInterval: 0.25
+--- !u!114 &2038274778
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2038274753}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66f7bbcee04888e499f0bd2c5b241692, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hordebreakers::Hordebreakers.TwoHandGrip
+  animator: {fileID: 1207653563}
+  weapon: {fileID: 499731937}
+  shaftLocalAxis: {x: 0, y: 1, z: 0}
+  gripLocalPoint: {x: 0, y: 0, z: 0}
+  engageDistance: 0.35
+  releaseDistance: 0.5
+  minHandSeparation: 0.15
+  blendSpeed: 14
+  attackStatesOnly: 1
 --- !u!1 &2097293857
 GameObject:
   m_ObjectHideFlags: 0
