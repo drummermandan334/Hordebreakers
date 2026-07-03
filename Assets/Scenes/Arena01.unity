@@ -1063,6 +1063,50 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 90.108116
       objectReference: {fileID: 0}
+    - target: {fileID: 8769816166073819935, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8769826698326294565, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8770346602939670247, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8770346718454540073, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8770431679152056985, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8770637328241057053, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8771051539769163805, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8771053606157602197, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8771063864594720413, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8771139402451222835, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8771275150588267755, guid: 546302864c20d1a47bc2159a89ab6190, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -1708,6 +1752,69 @@ MonoBehaviour:
   - {fileID: 825049814}
   readyColor: {r: 0.35, g: 0.85, b: 1, a: 1}
   rechargingColor: {r: 0.35, g: 0.85, b: 1, a: 0.55}
+--- !u!1001 &499731936
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 764543375}
+    m_Modifications:
+    - target: {fileID: 7483524104601599243, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483524104601599243, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483524104601599243, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483524104601599243, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483524104601599243, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483524104601599243, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483524104601599243, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483524104601599243, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483524104601599243, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7483524104601599243, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7823035309908142001, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+      propertyPath: m_Name
+      value: Spear
+      objectReference: {fileID: 0}
+    m_RemovedComponents:
+    - {fileID: -6967659339484155219, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+--- !u!4 &499731937 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7483524104601599243, guid: 4a0760383a03ad342bd2012d2b36c57b, type: 3}
+  m_PrefabInstance: {fileID: 499731936}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &520992721
 GameObject:
   m_ObjectHideFlags: 0
@@ -3152,6 +3259,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 973832079}
+  - {fileID: 499731937}
   m_Father: {fileID: 753592513}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &764543376
@@ -3571,7 +3679,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &973832079
 Transform:
   m_ObjectHideFlags: 0
@@ -8862,20 +8970,34 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hordebreakers.WeaponVfx
   animator: {fileID: 1207653563}
-  bladeSocket: {fileID: 973832079}
+  bladeSocket: {fileID: 499731937}
   slashVfx: {fileID: 1652400581503036, guid: 1f8b293f4d55bbc418cffe1b7505d6ed, type: 3}
   stabVfx: {fileID: 1473356317183098, guid: 16b154ffbfe6c5841b0a46456345a632, type: 3}
-  stabState: L3
-  slashLocalPosition: {x: 0, y: 0.5, z: 0}
+  stabStates:
+  - L1
+  - L2
+  - L3
+  - H3
+  slashLocalPosition: {x: 0, y: 1.4, z: 0}
   slashLocalEuler: {x: -90, y: 0, z: 90}
   slashScale: 0.6
-  stabLocalPosition: {x: 0, y: 0.3, z: 0}
+  stabLocalPosition: {x: 0, y: 1.55, z: 0}
   stabLocalEuler: {x: -90, y: 0, z: 0}
   stabScale: 0.5
   alignToBlade: 1
   slashSpeed: 0.8
   stabSpeed: 0.7
   lifetime: 0.4
+  lightStrikeFractions:
+  - 0.28
+  - 0.26
+  - 0.35
+  heavyStrikeFractions:
+  - 0.3
+  - 0.3
+  - 0.35
+  jumpLightStrikeFraction: 0.35
+  jumpHeavyStrikeFraction: 0.4
   lightStrikeFraction: 0.314
   heavyStrikeFraction: 0.48
 --- !u!114 &2038274766 stripped
