@@ -27,6 +27,10 @@ namespace Hordebreakers
         public float stepTime = 0.12f;
         [Tooltip("Sweep = sphere + front arc (arcs/cuts). Thrust = narrow forward capsule (stabs) — skewers in a line.")]
         public AttackHitShape hitShape = AttackHitShape.Sweep;
+        [Tooltip("This slot's clip drives XZ travel via ROOT MOTION: authored lunges/jumps move the character exactly as animated. stepSpeed/stepTime are ignored and mid-swing steer is disabled. Requires the clip's XZ position NOT baked into pose (SpearClipSettingsTool) + RootMotionRelay on the Animator.")]
+        public bool useRootMotion = false;
+        [Tooltip("SPINNING sweeps: the hit ignores the front-arc gate and connects all around the character (the swing covers 360°, so 'in front at contact' is meaningless mid-spin).")]
+        public bool hitAllAround = false;
         [Range(0f, 1f)]
         [Tooltip("Fraction of THIS clip that plays before the next attack can chain (earlier presses buffer). Per-clip so the combo rhythm matches each clip's real length.")]
         public float chainOpen = 0.75f;

@@ -1,8 +1,40 @@
-# Spear Kit — Animator Wiring & Tuning Guide (S4)
+# Spear Kit — Animator Wiring & Tuning Guide (S4 + Rig Migration)
 
 > Companion to the spear-kit code drop (per-slot `AttackSlotTuning`, thrust capsule hitbox, per-state
 > WeaponVfx fractions) and the tuned `PlayerCombatData.asset`. All clips are the pack's standalone
 > Humanoid `.anim` files under `Assets/SpearAnimationPack/Animations/Humanoid/02_Attack/`. All 60fps.
+
+## 0. RIG MIGRATION — champion on the pack-native skeleton (do this first)
+
+The grip/orientation bug class exists because the pack animates its **`Weapon_Actor_R` weapon socket**
+(generic curves humanoid retargeting drops on the Synty rig) and authors travel as **root motion** (which
+we discarded). The champion now runs on the pack's own skeleton — the authored spear handling and travel
+play natively. TwoHandGrip is DELETED; the socket animation replaces it.
+
+### Editor steps
+1. **Reimport `Assets/SpearAnimationPack/Model/9CG_Spear.fbx`:** Rig → Animation Type **Humanoid**,
+   Avatar Definition **Create From This Model**. Open Configure and confirm the auto-map/T-pose (UE-style
+   skeleton — maps cleanly; twist/IK/socket bones staying unmapped is correct).
+2. **SMOKE TEST (2 min, proves the approach before any prefab surgery):** drop `PreFabs/9CG_Spear.prefab`
+   into a scene, give it a throwaway controller playing `Combo_Attack_01_04` — during the two-hand grab the
+   **`Spear` prop must move by itself** (socket curves binding by path). If it does, everything else follows.
+3. **Player prefab:** replace the Synty model child with a `9CG_Spear` instance. The Animator must sit on
+   the `9CG_Spear` root (the parent of `root`) so clip paths bind; assign the new Avatar; keep
+   `PlayerAnimator.controller` as-is. Re-point `PlayerController.modelRoot`/`animator` refs.
+4. **Weapon:** use the prefab's own `Spear` under `Weapon_Actor_R`. `WeaponVfx.bladeSocket` → that spear.
+   **Remove the TwoHandGrip component** (script is deleted from the project).
+5. **Add `RootMotionRelay`** to the same GameObject as the Animator (it auto-finds the PlayerController).
+6. **Clip settings:** select the attack `.anim` clips → Hordebreakers → Spear Clip Settings Tool →
+   **FIX ORIENTATION** and **FIX POSITION XZ** (root-motion slots need both: strikes stay square to facing
+   AND the authored travel becomes real root deltas).
+7. The champion looks like the 9CG model until the Synty look is re-skinned onto this skeleton (art task).
+
+### What changed in code
+- `AttackSlotTuning.useRootMotion` (ON for L1/L2/L3 in the asset): the clip's authored XZ travel drives the
+  CharacterController via `RootMotionRelay` → `PlayerController.OnRootMotion`. No step, no steer — drift is
+  gone by design. Gravity/Y stays code-owned; clip rotation deltas are discarded (facing stays gameplay-driven).
+- Legacy (non-RM) slots keep the tuned step, with steer now gated to pre-contact only.
+- Contact phases / chain windows below are normalized-time and remain valid unchanged.
 
 ## 1. Why this mapping
 

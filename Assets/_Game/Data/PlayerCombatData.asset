@@ -56,7 +56,9 @@ MonoBehaviour:
     reachMult: 1
     stepSpeed: 3.2
     stepTime: 0.12
-    hitShape: 1
+    hitShape: 0
+    useRootMotion: 0
+    hitAllAround: 1
     chainOpen: 0.4
   - contactPhase: 0.26
     damageMult: 1
@@ -64,6 +66,8 @@ MonoBehaviour:
     stepSpeed: 3.2
     stepTime: 0.12
     hitShape: 1
+    useRootMotion: 0
+    hitAllAround: 0
     chainOpen: 0.37
   - contactPhase: 0.35
     damageMult: 1
@@ -71,6 +75,8 @@ MonoBehaviour:
     stepSpeed: 5
     stepTime: 0.15
     hitShape: 1
+    useRootMotion: 0
+    hitAllAround: 0
     chainOpen: 0.6
   heavySlots:
   - contactPhase: 0.3
@@ -79,6 +85,8 @@ MonoBehaviour:
     stepSpeed: 1.8
     stepTime: 0.12
     hitShape: 0
+    useRootMotion: 0
+    hitAllAround: 0
     chainOpen: 0.4
   - contactPhase: 0.3
     damageMult: 1
@@ -86,6 +94,8 @@ MonoBehaviour:
     stepSpeed: 1.8
     stepTime: 0.12
     hitShape: 0
+    useRootMotion: 0
+    hitAllAround: 0
     chainOpen: 0.4
   - contactPhase: 0.35
     damageMult: 1
@@ -93,6 +103,8 @@ MonoBehaviour:
     stepSpeed: 4.5
     stepTime: 0.15
     hitShape: 1
+    useRootMotion: 0
+    hitAllAround: 0
     chainOpen: 0.65
   jumpLightSlot:
     contactPhase: 0.35
@@ -101,6 +113,8 @@ MonoBehaviour:
     stepSpeed: 2.5
     stepTime: 0.12
     hitShape: 1
+    useRootMotion: 0
+    hitAllAround: 0
     chainOpen: 0.75
   jumpHeavySlot:
     contactPhase: 0.4
@@ -109,6 +123,8 @@ MonoBehaviour:
     stepSpeed: 2.5
     stepTime: 0.12
     hitShape: 0
+    useRootMotion: 0
+    hitAllAround: 0
     chainOpen: 0.75
   thrustRadius: 0.5
   thrustArcDot: 0.55

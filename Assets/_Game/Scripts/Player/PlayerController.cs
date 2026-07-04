@@ -123,6 +123,8 @@ namespace Hordebreakers
         private float _attackStepTimer;    // > 0 while the forward step is applied
         private float _pendingReach, _pendingDamage;   // the armed swing's hit, resolved at its contact phase
         private AttackSlotTuning _pendingSlot;         // the armed swing's per-slot tuning (contact phase, hit shape, chain window)
+        private Vector3 _rootVel;                      // last root-motion velocity applied by OnRootMotion (momentum sync for RM swings)
+        private Quaternion _rmAccumRot = Quaternion.identity;   // the swing's DISCARDED clip rotation, integrated — counter-rotates the travel (see OnRootMotion)
         private bool _pendingHeavy, _pendingFinisher;
         private bool _swingHitResolved;    // true once the current swing has landed its hit (one hit per swing)
         private float _nextSwingTime;      // earliest time the next swing can fire — a hard rate limit that holds across the inAttack=false gaps (after a combo / out of a dodge) where animator-state gating fails
@@ -247,6 +249,7 @@ namespace Hordebreakers
             _attackStepTimer = 0f; _attackVel = Vector3.zero;
             _bufferedAttack = 0; _bufferedDodge = false; _comboStep = 0;
             _castSwing = false; _swingHitResolved = false; _nextSwingTime = 0f; _pendingSlot = null;
+            _rootVel = Vector3.zero; _rmAccumRot = Quaternion.identity;
             _hitReactCdTimer = 0f; _lastAttackStateHash = 0;
             PostFxDirector.MusouGrade(false); PostFxDirector.SetHealthFraction(1f);   // clear any lingering ult grade / low-HP framing on respawn
             if (animator != null) { animator.Rebind(); animator.Update(0f); }
@@ -352,6 +355,7 @@ namespace Hordebreakers
                 if (atkHash != 0)
                 {
                     _swingHitResolved = false;
+                    _rmAccumRot = Quaternion.identity;   // fresh swing = fresh travel frame (no direction error carried across combo steps)
                     // Whoosh fires HERE — the instant a real swing animation begins — NOT on the input press. Definitive
                     // fix for the mash / "phantom attack" multi-whoosh: a press that doesn't actually start a new swing
                     // (a gap after a combo, coming out of a dodge, no valid transition) can no longer make a sound. Skip
@@ -373,12 +377,25 @@ namespace Hordebreakers
                     if (_castSwing) ResolveCast(); else ResolveSwingHit();
                 }
 
-                // Committed to a swing: the attack's forward lunge drives movement and OVERRIDES move input;
-                // the player only gets a slight steer (no free gliding mid-attack).
-                Vector3 momentum = _attackStepTimer > 0f ? _attackVel : Vector3.zero;
-                Vector3 attackVel = momentum + moveDir * data.attackSteerSpeed;
-                _planarVel = attackVel;   // sync momentum so stepping out of the swing into locomotion carries the real speed
-                MoveWithVertical(attackVel, dt);
+                // Committed to a swing. ROOT-MOTION slots (the spear kit): the clip's authored travel drives XZ —
+                // applied by OnRootMotion (via RootMotionRelay) right after the animator evaluates — so here we only
+                // resolve gravity. No hand-tuned step, NO steer at all: the drift is gone by design.
+                if (_pendingSlot != null && _pendingSlot.useRootMotion && !_castSwing)
+                {
+                    _planarVel = _rootVel;   // momentum continuity: exiting the swing carries the authored travel speed
+                    MoveWithVertical(Vector3.zero, dt);
+                }
+                else
+                {
+                    // Legacy (non-root-motion) swing: the tuned forward lunge OVERRIDES move input. Steer is allowed
+                    // only BEFORE the hit lands (micro-spacing into the strike); after contact you're PLANTED through
+                    // the follow-through — holding a direction can't skate the model across the ground.
+                    float steer = _swingHitResolved ? 0f : data.attackSteerSpeed;
+                    Vector3 momentum = _attackStepTimer > 0f ? _attackVel : Vector3.zero;
+                    Vector3 attackVel = momentum + moveDir * steer;
+                    _planarVel = attackVel;   // sync momentum so stepping out of the swing into locomotion carries the real speed
+                    MoveWithVertical(attackVel, dt);
+                }
                 SetAnimSpeed(0f, dt);
             }
             else if (IsBaseInDodge())
@@ -657,6 +674,58 @@ namespace Hordebreakers
         }
 
         // ---------- Movement ----------
+        /// <summary>How a root-motion swing's authored motion is mapped onto the character (see <see cref="OnRootMotion"/>).</summary>
+        public enum RootMotionTravelMode
+        {
+            ApplyClipRotation,   // the CLIP owns the swing: rotation (yaw) AND travel play as authored — spins actually spin
+            CompensatedPath,     // facing stays gameplay-locked; travel counter-rotated into the swing-start frame
+            ForwardOnly          // facing locked; travel magnitude applied straight along facing — guaranteed-straight fallback
+        }
+
+        [Header("Root motion (attack motion)")]
+        [Tooltip("ApplyClipRotation (default): during a root-motion swing the CLIP owns the character — authored yaw (spinning sweeps!) and travel both play; facing is re-aimed by gameplay on the next swing/locomotion. CompensatedPath/ForwardOnly: facing stays locked and only travel is mapped — for kits whose clips shouldn't turn the character.")]
+        [SerializeField] private RootMotionTravelMode rootMotionTravel = RootMotionTravelMode.ApplyClipRotation;
+
+        /// <summary>
+        /// Root-motion hand-off, called by <see cref="RootMotionRelay"/> from OnAnimatorMove (right after the animator
+        /// evaluates, so there's no frame lag). During a root-motion swing the clip's authored motion drives the
+        /// character: yaw is applied to <see cref="modelRoot"/> (a spinning sweep really spins — suppressing this
+        /// visibly "inhibits the animation") and XZ travel goes through the CharacterController; both deltas are
+        /// self-consistent, so lunges hold their authored line. Facing recovers via gameplay (AimFace re-aims each
+        /// swing; locomotion re-faces on exit). Y stays ours (gravity resolves in the Update attack branch).
+        /// Ignored outside root-motion swings.
+        /// </summary>
+        public void OnRootMotion(Vector3 deltaPosition, Quaternion deltaRotation)
+        {
+            bool rmSwing = _pendingSlot != null && _pendingSlot.useRootMotion && !_castSwing
+                           && !_musouActive && _dodgeTimer <= 0f && InComboAttack();
+            if (!rmSwing) { _rootVel = Vector3.zero; _rmAccumRot = Quaternion.identity; return; }
+
+            Vector3 d = deltaPosition;
+            if (rootMotionTravel == RootMotionTravelMode.ApplyClipRotation)
+            {
+                // The clip owns the swing. Yaw only — a leaning capsule would fight the CharacterController.
+                deltaRotation.ToAngleAxis(out float ang, out Vector3 axis);
+                if (modelRoot != null && ang > 0.0001f) modelRoot.Rotate(0f, ang * axis.y, 0f, Space.World);
+            }
+            else
+            {
+                // Facing-locked modes: integrate the UNAPPLIED turn and counter-rotate the travel into the swing-start frame.
+                _rmAccumRot = _rmAccumRot * deltaRotation;
+                d = Quaternion.Inverse(_rmAccumRot) * deltaPosition;
+                if (rootMotionTravel == RootMotionTravelMode.ForwardOnly && modelRoot != null)
+                {
+                    Vector3 flat = d; flat.y = 0f;
+                    float sign = Vector3.Dot(flat, modelRoot.forward) >= 0f ? 1f : -1f;   // retreat steps still back up
+                    d = modelRoot.forward * (flat.magnitude * sign);
+                }
+            }
+            d.y = 0f;   // XZ only — our gravity owns Y (a per-slot rootY flag can come later for plunges)
+            if (_cc != null && _cc.enabled) _cc.Move(d);
+            float dt = Time.deltaTime;
+            _rootVel = dt > 0.0001f ? d / dt : Vector3.zero;
+        }
+
         private void MoveWithVertical(Vector3 horizontalVel, float dt)
         {
             if (_cc.isGrounded && _verticalVel < 0f) _verticalVel = -2f;
@@ -843,7 +912,7 @@ namespace Hordebreakers
             // animator state change (CurrentAttackStateHash) — it lands at the clip's real contact phase, never on press.
             AttackSlotTuning slot = data.GetAttackSlot(_comboStep, heavy, !_grounded);
             _pendingSlot = slot;
-            StepForward(slot.stepSpeed, slot.stepTime);
+            if (!slot.useRootMotion) StepForward(slot.stepSpeed, slot.stepTime);   // RM slots: the clip's authored travel IS the step
             _pendingHeavy = heavy;
             _pendingFinisher = finisher;
             _pendingReach = (heavy ? data.heavyReach : data.lightReach) * slot.reachMult;
@@ -930,7 +999,8 @@ namespace Hordebreakers
             {
                 Collider col = _hits[i];
                 Vector3 to = col.transform.position - origin; to.y = 0f;
-                if (to.sqrMagnitude > 0.0001f && Vector3.Dot(to.normalized, fwd) < arcDot) continue;  // front arc only (tighter for thrusts)
+                bool allAround = _pendingSlot != null && _pendingSlot.hitAllAround;   // spinning sweeps connect 360°
+                if (!allAround && to.sqrMagnitude > 0.0001f && Vector3.Dot(to.normalized, fwd) < arcDot) continue;  // front arc only (tighter for thrusts)
                 if (col.TryGetComponent(out IDamageable d) && d.IsAlive)
                 {
                     d.TakeDamage(damage, origin);
